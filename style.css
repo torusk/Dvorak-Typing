@@ -88,7 +88,13 @@ body{
 }
 .key.wide{min-width:84px}
 .key.space{min-width:50vw}
-.key.active{background:#818cf8; color:#fff; outline:none}
+.key.active{
+  /* 背景色はそのまま（灰色）。有効時は太い枠線で強調 */
+  background:var(--key-bg);
+  color:var(--key-fg);
+  outline:3px solid #000; /* 枠色: 黒 */
+  outline-offset:0;
+}
 
 .mode select{
   height:32px; border:1px solid #e5e7eb; border-radius:6px; padding:0 8px; font-weight:600;
@@ -103,3 +109,4 @@ body{
   .key{height:54px; font-size:22px} /* ← 調整ポイント（必要に応じて変えてOK） */
   .text{font-size:22px}
 }
+
