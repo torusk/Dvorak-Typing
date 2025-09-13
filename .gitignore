@@ -1,0 +1,19 @@
+# OS / エディタ由来
+.DS_Store
+**/.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+.Spotlight-V100
+.Trashes
+
+# エディタ設定（不要なら削除可）
+.vscode/
+.idea/
+
+# ログ
+*.log
+
+# 大きな動画は除外（要望）
+*.mp4
+
