@@ -14,7 +14,7 @@ VS Code と Codex（Codex CLI）で作成した、ブラウザで動く Dvorak �
 ## 使い方（Getting Started）
 - `index.html` をブラウザで開くだけで動作します。
   - ローカルサーバ例: `python3 -m http.server 8000`
-- 上部のテキストを順にタイプ。完了すると自動で次の課題へ（`Enter` でも進行）。
+- 上部のテキストを順にタイプ。完了すると自動で次の課題へ。
 - ヘッダー右側の「練習モード」で「英文 / CLI」を切替可能です。
 
 ## デモ
@@ -22,7 +22,6 @@ VS Code と Codex（Codex CLI）で作成した、ブラウザで動く Dvorak �
 ![Dvorak Typing - Demo](assets/typing.gif)
 
 ### 操作（ショート）
-- `Enter`: 改行（課題が終わっていれば次へ）
 - `Backspace`: 1文字戻る
 - `Tab`: 半角スペース2つ（画面/物理）
 - `Shift`: 有効中は数字→記号、英字→大文字表示に切替（物理/画面の両方に連動）

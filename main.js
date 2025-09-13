@@ -5,7 +5,7 @@
   - 英文/CLIの課題文から1行分だけを画面幅にフィットさせて表示
   - 入力評価は逐次1文字: 正解=黒 / ミス=赤 / 未入力=灰
   - 物理キーボード・仮想キーボードの両方をサポート
-  - 文末入力完了後はスペースで次の課題へ
+  - 文末入力完了後は自動で次の課題へ
 */
 // ===== Dvorak配列 =====
 const DVORAK_NUMBER_ROW = ["`","1","2","3","4","5","6","7","8","9","0","[","]"];
@@ -79,6 +79,7 @@ function escapeHTML(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt
 // Dvorak配列に基づき5段（数字/第1〜3行/スペース）を生成。
 // 各キーは data-key に基底コードを持ち、クリックで handleVirtualKey()。
 function buildKeyboard(){
+  if(!keyboardEl) return;
   keyboardEl.innerHTML = "";
   const row = (keys, head=null, tail=null)=>{
     const r = document.createElement('div'); r.className='row';
@@ -101,7 +102,7 @@ function buildKeyboard(){
   keyboardEl.appendChild(spaceRow);
 }
 function makeKey(label, code, wide=false){ const b=document.createElement('button'); b.className="key"+(wide?" wide":""); b.textContent=label; b.dataset.key=code; b.addEventListener('click',()=>handleVirtualKey(code)); return b; }
-function getKeyEl(code){ return keyboardEl.querySelector(`[data-key="${cssEscape(code)}"]`); }
+function getKeyEl(code){ if(!keyboardEl) return null; return keyboardEl.querySelector(`[data-key="${cssEscape(code)}"]`); }
 function flashKey(code, ok){ const el=getKeyEl(code); if(!el) return; el.classList.remove('flash-correct','flash-wrong'); void el.offsetWidth; el.classList.add(ok?'flash-correct':'flash-wrong'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('flash-correct','flash-wrong'),140); }
 function isShiftActive(){ return shiftSticky || shiftPhysical; }
 function syncShiftKeys(){ const a=isShiftActive(); keyboardEl.querySelectorAll('[data-key="shift"]').forEach(el=>el.classList.toggle('active',a)); updateKeyLabelsForShift(); }
@@ -137,6 +138,7 @@ function resolveOutput(code){
 // 目的: 現在のフォントで実測し、画面幅に収まる単語数だけを表示。
 // ポイント: 既にタイプ済みの単語数は維持しつつ、末尾のみ削って合わせる。
 function getKeyboardWidth(){
+  if(!keyboardEl){ return Math.min(820, window.innerWidth - 16); }
   const rect = keyboardEl.getBoundingClientRect();
   return rect.width || Math.min(820, window.innerWidth - 16);
 }
@@ -186,6 +188,7 @@ function layoutOneLine(){
 // flatText を1文字ずつ <span> にし、marks[] に応じてクラスを付与。
 // CSS 側で `.char.correct` `.char.wrong` `.char.current` を色分け表示。
 function renderText(){
+  if(!textEl) return;
   let out="";
   for(let i=0;i<flatText.length;i++){
     const ch=flatText[i];
@@ -205,8 +208,7 @@ function renderText(){
 // onChar         : 期待文字と比較し、正解なら前進 / ミスなら赤表示
 function handleVirtualKey(code){
   if(code === 'backspace') return onBackspace();
-  // 行末に達している場合、スペース入力で次の課題へ
-  if(code === 'space' && cursor === flatText.length){ return nextSentence(); }
+  if(code === 'space' && cursor===flatText.length){ return nextSentence(); }
   const out = resolveOutput(code);
   if(out==null) return;
   if(out.length===1) return onChar(out, code);
@@ -224,6 +226,7 @@ function onChar(input, baseCode){
     if(keyId===' ') flashKey('space', true); else flashKey(keyId, true);
     cursor = clamp(cursor+1,0,flatText.length);
     renderText();
+    // 行末到達時の自動遷移はしない（スペース押下で進む）
   }else{
     marks[cursor] = -1;
     const keyId = baseCode || ch.toLowerCase();
@@ -251,7 +254,7 @@ function prepareSource(){
   sourceWords = three.join(' ').split(' ');
 }
 function pickSentence(){
-  // 出題の初期化（1行フィットし、カーソルと進捗をリセット）
+  // 出題の初期化。レイアウト確定後に message を消す。
   prepareSource();
   cursor = 0;
   marks = [];
@@ -262,14 +265,15 @@ function nextSentence(){
   sentenceIndex = (sentenceIndex+3) % set.length;
   pickSentence();
 }
-// resetGame は未使用のため削除しました
 
 // ===== 初期化 =====
 // 重要: リサイズ時に常に末尾だけを再調整し、途中までの進捗を保つ。
 function init(){
   buildKeyboard();
   syncShiftKeys();
-  modeSel.addEventListener('change', ()=>{ mode = modeSel.value; sentenceIndex=0; pickSentence(); });
+  if(modeSel){
+    modeSel.addEventListener('change', ()=>{ mode = modeSel.value; sentenceIndex=0; pickSentence(); });
+  }
 
   // 物理キーボード
   window.addEventListener('keydown',(e)=>{
@@ -280,9 +284,8 @@ function init(){
     if(k==='Tab'){ e.preventDefault(); onChar(' ','tab'); onChar(' ','tab'); return; }
     if(k===' '){
       e.preventDefault();
-      if(cursor === flatText.length){ nextSentence(); return; }
-      onChar(' ','space');
-      return;
+      if(cursor===flatText.length) return nextSentence();
+      return onChar(' ','space');
     }
     if(k.length===1){
       const base = /^[A-Z]$/.test(k) ? k.toLowerCase() : (REVERSE_SHIFT_MAP[k] || k);
