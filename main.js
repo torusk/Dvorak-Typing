@@ -5,7 +5,7 @@
   - 英文/CLIの課題文から1行分だけを画面幅にフィットさせて表示
   - 入力評価は逐次1文字: 正解=黒 / ミス=赤 / 未入力=灰
   - 物理キーボード・仮想キーボードの両方をサポート
-  - 文末入力完了後は自動で次の課題へ
+  - 文末入力完了後はスペースで次の課題へ
 */
 // ===== Dvorak配列 =====
 const DVORAK_NUMBER_ROW = ["`","1","2","3","4","5","6","7","8","9","0","[","]"];
@@ -60,10 +60,7 @@ let shiftPhysical = false;
 
 // ===== 要素 =====
 const textEl = document.getElementById("text");
-const messageEl = document.getElementById("message");
 const keyboardEl = document.getElementById("keyboard");
-const resetBtn = document.getElementById("resetBtn");
-const skipBtn = document.getElementById("skipBtn");
 const modeSel = document.getElementById("modeSelect");
 
 // ===== ユーティリティ =====
@@ -208,6 +205,8 @@ function renderText(){
 // onChar         : 期待文字と比較し、正解なら前進 / ミスなら赤表示
 function handleVirtualKey(code){
   if(code === 'backspace') return onBackspace();
+  // 行末に達している場合、スペース入力で次の課題へ
+  if(code === 'space' && cursor === flatText.length){ return nextSentence(); }
   const out = resolveOutput(code);
   if(out==null) return;
   if(out.length===1) return onChar(out, code);
@@ -225,10 +224,6 @@ function onChar(input, baseCode){
     if(keyId===' ') flashKey('space', true); else flashKey(keyId, true);
     cursor = clamp(cursor+1,0,flatText.length);
     renderText();
-    if(cursor===flatText.length){
-      messageEl.textContent = '完了！ 次の課題を読み込みます';
-      setTimeout(()=>nextSentence(), 500);
-    }
   }else{
     marks[cursor] = -1;
     const keyId = baseCode || ch.toLowerCase();
@@ -256,31 +251,24 @@ function prepareSource(){
   sourceWords = three.join(' ').split(' ');
 }
 function pickSentence(){
-  // 出題の初期化。レイアウト確定後に message を消す。
+  // 出題の初期化（1行フィットし、カーソルと進捗をリセット）
   prepareSource();
   cursor = 0;
   marks = [];
   layoutOneLine();     // 1行に収める（末尾削除）
-  messageEl.textContent = "";
 }
 function nextSentence(){
   const set = currentSet();
   sentenceIndex = (sentenceIndex+3) % set.length;
   pickSentence();
 }
-function resetGame(){
-  // 冒頭から再スタート
-  sentenceIndex = 0;
-  pickSentence();
-}
+// resetGame は未使用のため削除しました
 
 // ===== 初期化 =====
 // 重要: リサイズ時に常に末尾だけを再調整し、途中までの進捗を保つ。
 function init(){
   buildKeyboard();
   syncShiftKeys();
-  resetBtn.addEventListener('click', resetGame);
-  skipBtn.addEventListener('click', nextSentence);
   modeSel.addEventListener('change', ()=>{ mode = modeSel.value; sentenceIndex=0; pickSentence(); });
 
   // 物理キーボード
@@ -290,7 +278,12 @@ function init(){
     if(k==='Backspace'){ e.preventDefault(); onBackspace(); return; }
     if(k==='Enter'){ e.preventDefault(); return; }
     if(k==='Tab'){ e.preventDefault(); onChar(' ','tab'); onChar(' ','tab'); return; }
-    if(k===' '){ e.preventDefault(); onChar(' ','space'); return; }
+    if(k===' '){
+      e.preventDefault();
+      if(cursor === flatText.length){ nextSentence(); return; }
+      onChar(' ','space');
+      return;
+    }
     if(k.length===1){
       const base = /^[A-Z]$/.test(k) ? k.toLowerCase() : (REVERSE_SHIFT_MAP[k] || k);
       return onChar(k, base);

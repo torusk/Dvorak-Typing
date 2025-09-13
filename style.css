@@ -65,9 +65,7 @@ body{
 .text .char.wrong{color:var(--tile-wrong)}
 .text .char.current{position:relative; text-decoration:underline; text-underline-offset:6px}
 
-.message{min-height:22px; color:#444; font-size:14px; text-align:center}
 
-.spacer{height:4px}
 
 /* === キーボード === */
 .keyboard-wrapper{background:var(--bg); border-top:none; padding:10px 8px; width:100%; display:flex; justify-content:center}
