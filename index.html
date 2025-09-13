@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dvorak Typing Game</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1 class="title">Dvorak Typing</h1>
+      <div class="controls">
+        <button id="resetBtn" class="btn">リセット</button>
+        <button id="skipBtn" class="btn">次の単語</button>
+        <label class="mode">
+          練習モード:
+          <select id="modeSelect">
+            <option value="en" selected>英文</option>
+            <option value="cli">CLI</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <main class="game" aria-live="polite">
+      <section class="statusbar">
+        <div>スコア: <span id="score">0</span></div>
+        <div>ミス: <span id="miss">0</span></div>
+      </section>
+      <section id="text" class="text" aria-label="タイプ対象の英文"></section>
+      <section id="message" class="message" role="status"></section>
+      <div class="spacer"></div>
+      <footer class="keyboard-wrapper" aria-label="Dvorak キーボード">
+        <div id="keyboard" class="keyboard"></div>
+      </footer>
+    </main>
+    <noscript>このアプリはJavaScriptが必要です。</noscript>
+    <script src="main.js" defer></script>
+  </body>
+  </html>
