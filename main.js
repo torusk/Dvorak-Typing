@@ -1,3 +1,12 @@
+/*
+  main.js — タイプ練習の中枢ロジック
+  概要:
+  - Dvorak配列の仮想キーボードを生成（クリック入力対応）
+  - 英文/CLIの課題文から1行分だけを画面幅にフィットさせて表示
+  - 入力評価は逐次1文字: 正解=黒 / ミス=赤 / 未入力=灰
+  - 物理キーボード・仮想キーボードの両方をサポート
+  - 文末入力完了後は自動で次の課題へ
+*/
 // ===== Dvorak配列 =====
 const DVORAK_NUMBER_ROW = ["`","1","2","3","4","5","6","7","8","9","0","[","]"];
 const DVORAK_ROW1 = ["'", ",", ".", "p","y","f","g","c","r","l","/","=","\\"];
@@ -5,6 +14,8 @@ const DVORAK_ROW2 = ["a","o","e","u","i","d","h","t","n","s","-"];
 const DVORAK_ROW3 = [";","q","j","k","x","b","m","w","v","z"];
 
 // ===== 課題文 =====
+// EXERCISES_EN: Dvorakの説明文（小文字中心）
+// EXERCISES_CLI: よく使うコマンド例（小文字中心）
 const EXERCISES_EN = [
   "with the dvorak layout, common letters sit under strong fingers.",
   "less finger travel means less fatigue and smoother rhythm.",
@@ -26,6 +37,14 @@ const EXERCISES_CLI = [
 ];
 
 // ===== 状態 =====
+// mode           : 'en'（英文）| 'cli'（コマンド）
+// sentenceIndex  : 出題の進行位置（3文ずつ進める）
+// sourceWords    : 出題候補（複数文を空白で連結→単語配列）
+// flatText       : 実際に1行表示される文字列（画面幅に合わせて末尾カット）
+// cursor         : flatText 上での現在位置（0..length）
+// marks[]        : 0=未入力 / 1=正解 / -1=ミス（renderTextで色分け）
+// shiftSticky    : 仮想Shiftのトグル（1打鍵で自動解除）
+// shiftPhysical  : 物理Shiftの押下状態
 let mode = 'en';
 let sentenceIndex = 0;
 
@@ -48,6 +67,10 @@ const skipBtn = document.getElementById("skipBtn");
 const modeSel = document.getElementById("modeSelect");
 
 // ===== ユーティリティ =====
+// clamp         : 数値の範囲制限
+// cssEscape     : data属性用の安全なセレクタ化
+// SHIFT_MAP     : Shift押下時の置換表
+// REVERSE_SHIFT_MAP: 記号→ベースキーの逆引き
 const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
 const cssEscape = (s)=> (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
 const SHIFT_MAP = {"1":"!","2":"@","3":"#","4":"$","5":"%","6":"^","7":"&","8":"*","9":"(","0":")","[":"{","]":"}","`":"~","-":"_","=":"+","/":"?","\\":"|",";":":",",":"<",".":">","'":"\""};
@@ -56,6 +79,8 @@ function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.
 function escapeHTML(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ===== 仮想キーボード =====
+// Dvorak配列に基づき5段（数字/第1〜3行/スペース）を生成。
+// 各キーは data-key に基底コードを持ち、クリックで handleVirtualKey()。
 function buildKeyboard(){
   keyboardEl.innerHTML = "";
   const row = (keys, head=null, tail=null)=>{
@@ -96,6 +121,7 @@ function updateKeyLabelsForShift(){
   });
 }
 function resolveOutput(code){
+  // 仮想キーを出力文字に変換。'enter'は1行運用のため無効化。
   if(code==='space') return ' ';
   if(code==='tab') return '  ';
   if(code==='backspace') return null;
@@ -111,11 +137,14 @@ function resolveOutput(code){
 }
 
 // ===== 1行フィット（英文・CLI 共通ロジック） =====
+// 目的: 現在のフォントで実測し、画面幅に収まる単語数だけを表示。
+// ポイント: 既にタイプ済みの単語数は維持しつつ、末尾のみ削って合わせる。
 function getKeyboardWidth(){
   const rect = keyboardEl.getBoundingClientRect();
   return rect.width || Math.min(820, window.innerWidth - 16);
 }
 function fitWordsToWidth(words, limitPx){
+  // canvas の 2D コンテキストでテキスト幅をピクセル計測
   const cs = getComputedStyle(textEl);
   const ctx = document.createElement('canvas').getContext('2d');
   ctx.font = `${cs.fontStyle} ${cs.fontVariant} ${cs.fontWeight} ${cs.fontSize} / ${cs.lineHeight} ${cs.fontFamily}`.replace(/\s+/g,' ').trim();
@@ -131,11 +160,13 @@ function fitWordsToWidth(words, limitPx){
   return words.slice(0, Math.max(1, count)); // 最低1語は表示
 }
 function minWordsToKeepForCursor(){
+  // カーソルより左側に含まれる単語数（最低保持数）を計算
   const prefix = flatText.slice(0, cursor);
   if(!prefix) return 1;
   return prefix.split(' ').length;
 }
 function layoutOneLine(){
+  // 画面幅とフォントから収まる単語数を算出し、flatTextを再構成
   const kbw = getKeyboardWidth();
   textEl.style.maxWidth = `${Math.floor(kbw)}px`;  // 文字サイズは変えない
   const minKeep = minWordsToKeepForCursor();
@@ -155,6 +186,8 @@ function layoutOneLine(){
 }
 
 // ===== 描画（常に1行） =====
+// flatText を1文字ずつ <span> にし、marks[] に応じてクラスを付与。
+// CSS 側で `.char.correct` `.char.wrong` `.char.current` を色分け表示。
 function renderText(){
   let out="";
   for(let i=0;i<flatText.length;i++){
@@ -171,6 +204,8 @@ function renderText(){
 }
 
 // ===== 入力処理 =====
+// handleVirtualKey: 仮想キーの押下を resolve → onChar へ
+// onChar         : 期待文字と比較し、正解なら前進 / ミスなら赤表示
 function handleVirtualKey(code){
   if(code === 'backspace') return onBackspace();
   const out = resolveOutput(code);
@@ -179,6 +214,7 @@ function handleVirtualKey(code){
   for(const ch of out) onChar(ch, code);
 }
 function onChar(input, baseCode){
+  // baseCode は仮想/物理入力の基底キーID（キーフラッシュ用）
   const expected = flatText[cursor];
   if(!expected) return;
   const ch = String(input);
@@ -201,6 +237,7 @@ function onChar(input, baseCode){
   }
 }
 function onBackspace(){
+  // ミス表示があればまず解除。なければ1文字戻る（正解表示も解除）
   if(marks[cursor]===-1){ marks[cursor]=0; renderText(); return; }
   if(cursor>0){ cursor--; marks[cursor]=0; renderText(); }
 }
@@ -209,6 +246,7 @@ function onBackspace(){
 function currentSet(){ return mode==='cli' ? EXERCISES_CLI : EXERCISES_EN; }
 
 // モードに関係なく「3つ分を連結 → 単語配列化」して1行フィット
+// 複数文を用いることで1行に十分な密度を確保する。
 function prepareSource(){
   const set = currentSet();
   if(sentenceIndex===0) shuffle(set);
@@ -218,6 +256,7 @@ function prepareSource(){
   sourceWords = three.join(' ').split(' ');
 }
 function pickSentence(){
+  // 出題の初期化。レイアウト確定後に message を消す。
   prepareSource();
   cursor = 0;
   marks = [];
@@ -230,11 +269,13 @@ function nextSentence(){
   pickSentence();
 }
 function resetGame(){
+  // 冒頭から再スタート
   sentenceIndex = 0;
   pickSentence();
 }
 
 // ===== 初期化 =====
+// 重要: リサイズ時に常に末尾だけを再調整し、途中までの進捗を保つ。
 function init(){
   buildKeyboard();
   syncShiftKeys();

@@ -1,3 +1,9 @@
+<!--
+  アプリ本体のHTML。
+  - ヘッダー: タイトル/操作ボタン/モード選択
+  - メイン: タイプ対象テキスト、状態メッセージ、仮想キーボード
+  スタイルは style.css、動作は main.js が担当。
+-->
 <!doctype html>
 <html lang="ja">
   <head>
@@ -7,8 +13,10 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <!-- アプリ上部の固定ヘッダー（タイトルと操作系） -->
     <header class="app-header">
       <h1 class="title">Dvorak Typing</h1>
+      <!-- 基本操作: リセット/スキップ と 練習モードの切替 -->
       <div class="controls">
         <button id="resetBtn" class="btn">リセット</button>
         <button id="skipBtn" class="btn">次の単語</button>
@@ -22,10 +30,14 @@
       </div>
     </header>
 
+    <!-- メイン領域：テキスト・メッセージ・仮想キーボード -->
     <main class="game" aria-live="polite">
+      <!-- タイプ対象のテキスト。main.js の renderText() で1文字ずつ構築される -->
       <section id="text" class="text" aria-label="タイプ対象の英文"></section>
+      <!-- 状態メッセージ（完了など）を表示 -->
       <section id="message" class="message" role="status"></section>
       <div class="spacer"></div>
+      <!-- 画面下部の仮想キーボード。main.js の buildKeyboard() でDOM生成 -->
       <footer class="keyboard-wrapper" aria-label="Dvorak キーボード">
         <div id="keyboard" class="keyboard"></div>
       </footer>
@@ -33,4 +45,4 @@
     <noscript>このアプリはJavaScriptが必要です。</noscript>
     <script src="main.js" defer></script>
   </body>
-</html>
+  </html>
