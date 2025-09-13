@@ -5,10 +5,6 @@
   --key-correct:#6aaa64;
   --key-present:#c9b458;
   --key-absent:#3a3a3c;
-  --tile-bg:#ffffff;
-  --tile-border:#d3d6da;
-  --tile-fg:#111;
-  --tile-correct:#6aaa64;
   --tile-wrong:#b00020;
 }
 
@@ -43,20 +39,27 @@ body{
   max-width:920px; margin:0 auto; padding:24px; width:100%; flex:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;
 }
-.statusbar{display:flex; gap:16px; font-weight:600}
+
+/* === 表示テキスト（常に1行） === */
 .text{
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   font-size:28px; line-height:1.6; letter-spacing:0.2px;
-  white-space:pre-wrap; text-align:center;
+  white-space:nowrap;          /* 必ず1行 */
+  overflow:hidden;             /* 幅からはみ出る分はJS側で単語削除 */
+  text-overflow:clip;
+  text-align:center;
+  max-width:900px; margin:0 auto;
 }
-.text .typed{color:inherit}
-.text .current{position:relative; text-decoration:underline; text-underline-offset:6px}
-.text .remaining{color:#222}
+.text .char{color:#6b7280}
+.text .char.correct{color:#111}
+.text .char.wrong{color:var(--tile-wrong)}
+.text .char.current{position:relative; text-decoration:underline; text-underline-offset:6px}
 
 .message{min-height:22px; color:#444; font-size:14px; text-align:center}
 
 .spacer{height:4px}
 
+/* === キーボード === */
 .keyboard-wrapper{background:var(--bg); border-top:none; padding:10px 8px; width:100%; display:flex; justify-content:center}
 .keyboard{display:flex; flex-direction:column; gap:10px; width:100%; max-width:820px}
 .row{display:flex; gap:6px; justify-content:center}
@@ -65,8 +68,15 @@ body{
   user-select:none;
   background:var(--key-bg); color:var(--key-fg);
   border:none; border-radius:6px; height:60px; min-width:46px;
-  padding:0 10px; font-weight:700; cursor:pointer;
+  padding:0 10px; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
+
+  /* ===== CHANGED: ラベルの“黄金比”サイズに微調整 =====
+     以前より小さめ：読みやすさとバランスを両立
+     必要なら 22px〜26px の範囲で微調整してください。 */
+  font-weight:800;
+  font-size:19px;        /* ← 調整ポイント（前回28px → 24px） */
+  letter-spacing:0.25px; /* ← 少しだけ広げる。詰めたい場合は 0 に */
 }
 .key.wide{min-width:84px}
 .key.space{min-width:50vw}
@@ -75,13 +85,13 @@ body{
 .mode select{
   height:32px; border:1px solid #e5e7eb; border-radius:6px; padding:0 8px; font-weight:600;
 }
-.key.correct{background:var(--key-correct); color:#fff}
-.key.present{background:var(--key-present); color:#fff}
-.key.absent{background:var(--key-absent); color:#fff}
+
 .key.flash-correct{background:var(--key-correct) !important; color:#fff}
 .key.flash-wrong{background:var(--tile-wrong) !important; color:#fff}
 
+/* ===== CHANGED: スモールスクリーン時も“見た目バランス”優先 =====
+   さらに小さい端末向けに2ptだけ下げています。 */
 @media (max-width:420px){
-  .key{height:54px}
+  .key{height:54px; font-size:22px} /* ← 調整ポイント（必要に応じて変えてOK） */
   .text{font-size:22px}
 }
