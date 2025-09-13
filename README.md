@@ -17,6 +17,10 @@ VS Code と Codex（Codex CLI）で作成した、ブラウザで動く Dvorak �
 - 上部のテキストを順にタイプ。完了すると自動で次の課題へ（`Enter` でも進行）。
 - ヘッダー右側の「練習モード」で「英文 / CLI」を切替可能です。
 
+## デモ
+
+![Dvorak Typing - Demo](assets/typing.gif)
+
 ### 操作（ショート）
 - `Enter`: 改行（課題が終わっていれば次へ）
 - `Backspace`: 1文字戻る
