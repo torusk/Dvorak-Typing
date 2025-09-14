@@ -12,10 +12,14 @@
   --bg:#fafafa;
   --key-bg:#d3d6da;
   --key-fg:#111;
-  --key-correct:#6aaa64;
+  /* 明るい緑（テキスト/キーの正解色に共通で使用） */
+  --accent-green:#22c55e; /* 調整ポイント: もう少し明るい→ #34d399 / 濃い→ #16a34a */
+  --key-correct:var(--accent-green);
   --key-present:#c9b458;
   --key-absent:#3a3a3c;
   --tile-wrong:#b00020;
+  /* 未入力テキストの基準色（3行共通）。ここを薄く/濃くすれば全体が揃います */
+  --text-muted:#c3c9d1;
 }
 
 *{box-sizing:border-box}
@@ -57,21 +61,24 @@ body{
   white-space:nowrap;          /* 必ず1行 */
   overflow:hidden;             /* 幅からはみ出る分はJS側で単語削除 */
   text-overflow:clip;
-  text-align:center;
+  /* 中央揃え→左揃え。キーボードと同じ左端に合わせる */
+  text-align:left;
   max-width:900px; margin:0 auto;
   --line-gap: 12px;           /* 3行の縦間隔（ここを調整） */
   --text-offset-y: -12px;     /* 文字列ブロックの縦位置（負値で上に） */
   transform: translateY(var(--text-offset-y));
 }
-.text .char{color:#6b7280}
-.text .char.correct{color:#111}
+.text .char{color:var(--text-muted)}       /* 未入力の基準色（行1） */
+.text .char.pending{color:var(--text-muted)}
+.text .char.correct{color:#111}           /* 入力済み（正解）は黒に */
 .text .char.wrong{color:var(--tile-wrong)}
-.text .char.current{position:relative; text-decoration:underline; text-underline-offset:6px}
+.text .char.current{position:relative; text-decoration:underline; text-underline-offset:6px; text-decoration-color:var(--accent-green)}
 
 /* 3行表示用 */
 .text .line{white-space:nowrap; display:block}
 .text .line + .line{ margin-top: var(--line-gap); }
-.text .next-line{color:#6b7280; opacity:0.9}
+/* 行2・行3（プレビュー）も同じ薄さで統一 */
+.text .next-line{color:var(--text-muted)}
 
 
 
