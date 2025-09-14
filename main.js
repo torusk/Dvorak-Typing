@@ -54,9 +54,13 @@ let wordsOffset = 0;         // 現在の「2行目（入力中）」が始ま�
 let flatText = "";          // 2行目（入力中）のテキスト
 let cursor = 0;             // 2行目のカーソル位置（0..length）
 let marks = [];             // 0:未入力 / 1:正解 / -1:ミス（2行目のみ）
-let line2WordCount = 0;     // 現在の2行目の語数（行送り時に消費する）
+let line1WordCount = 0;     // 現在の1行目（activeRow=1）の語数
+let line2WordCount = 0;     // 現在の2行目（activeRow=2）の語数
 let historyHTML = "";       // 1行目に表示する直前の完成行（HTMLスナップショット）
+let nextPreview1 = "";     // 2行目（プレビュー）のテキスト（activeRow=1時）
 let nextPreview2 = "";     // 3行目（プレビュー）のテキスト
+let activeRow = 1;          // 1=初回は1行目から入力 / 2=以後は常に2行目入力
+let centeredMode = false;   // 一度2行目に入ったら以後は2行目を現在行に
 
 // Shift系
 let shiftSticky = false;
@@ -188,6 +192,7 @@ function layoutThreeLines(){
 
   const pool = futureWordsPool();
   const minKeep = minWordsToKeepForCursor();
+  // プレースホルダ履歴は作らない（案B）
 
   const oldCursor = cursor;
   if(activeRow===1){
@@ -341,8 +346,10 @@ function pickSentence(){
   wordsOffset = 0;
   cursor = 0;
   marks = [];
-  historyHTML = ""; // 履歴は初期化
-  activeRow = 1;     // 初回は1行目から入力
+  // 履歴は原則保持（案A）。初回のみ空にする。
+  if(!centeredMode) historyHTML = "";
+  // 初回のみ1行目から。2行目に入ったことがあれば以後は2行目固定
+  activeRow = centeredMode ? 2 : 1;
   layoutThreeLines();   // 3行に分割して表示
 }
 function nextSentence(){
@@ -373,6 +380,7 @@ function advanceLine(){
     // 1行目分だけ語を消費し、以後は常に2行目で入力
     wordsOffset += (line1WordCount || 0);
     activeRow = 2;
+    centeredMode = true;
   }else{
     // 2行目分を消費して次へ（行送り）
     wordsOffset += (line2WordCount || 0);
