@@ -58,9 +58,12 @@ let line1WordCount = 0;     // 現在の1行目（activeRow=1）の語数
 let line2WordCount = 0;     // 現在の2行目（activeRow=2）の語数
 let historyHTML = "";       // 1行目に表示する直前の完成行（HTMLスナップショット）
 let nextPreview1 = "";     // 2行目（プレビュー）のテキスト（activeRow=1時）
+let nextPreview1Words = 0; // 2行目プレビューの語数（1→2行目移行直後に固定採用）
 let nextPreview2 = "";     // 3行目（プレビュー）のテキスト
+let nextPreview2Words = 0;  // 3行目プレビューの語数
 let activeRow = 1;          // 1=初回は1行目から入力 / 2=以後は常に2行目入力
 let centeredMode = false;   // 一度2行目に入ったら以後は2行目を現在行に
+let adoptNextAsCurrent = 0; // 0:通常 1:旧nextPreview1を現在行に 2:旧nextPreview2を現在行に
 
 // Shift系
 let shiftSticky = false;
@@ -171,7 +174,8 @@ function fitWordsToWidth(words, limitPx){
 function minWordsToKeepForCursor(){
   // カーソルより左側に含まれる単語数（最低保持数）を計算
   const prefix = flatText.slice(0, cursor);
-  if(!prefix) return 1;
+  // 新しい行の先頭では 0 語保持（再出現を防止）
+  if(!prefix) return 0;
   return prefix.split(' ').length;
 }
 function futureWordsPool(){
@@ -214,6 +218,7 @@ function layoutThreeLines(){
       line2 = after1.slice(0, c2).join(' ');
     }
     nextPreview1 = line2;
+    nextPreview1Words = c2;
 
     // 行3プレビュー
     let c3 = 0; let line3 = "";
@@ -223,12 +228,44 @@ function layoutThreeLines(){
       c3 = Math.min(fit3.length, after2.length);
       line3 = after2.slice(0, c3).join(' ');
     }
-    nextPreview2 = line3;
+    nextPreview2 = line3; nextPreview2Words = c3;
   }else{
     // 行2を現在行として構成（履歴はhistoryHTML）
-    const fit2 = fitWordsToWidth(pool, kbw);
-    line2WordCount = Math.min(Math.max(minKeep, fit2.length), Math.max(1, pool.length));
-    flatText = pool.slice(0, line2WordCount).join(' ');
+    // 採用フラグがある場合はキャッシュをそのまま使う
+    if(adoptNextAsCurrent===1){
+      line2WordCount = Math.min(nextPreview1Words||0, Math.max(1, pool.length));
+      flatText = nextPreview1;
+      adoptNextAsCurrent = 0; nextPreview1Words = 0; // 消費
+      // nextPreview2 はそのまま維持
+    }else if(adoptNextAsCurrent===2){
+      line2WordCount = Math.min(nextPreview2Words||0, Math.max(1, pool.length));
+      flatText = nextPreview2;
+      adoptNextAsCurrent = 0;
+      // 採用後は新しい3行目を再計算
+      const after2b = pool.slice(line2WordCount);
+      let c3b=0, line3b="";
+      if(after2b.length){
+        const fit3b = fitWordsToWidth(after2b, kbw);
+        c3b = Math.min(fit3b.length, after2b.length);
+        line3b = after2b.slice(0, c3b).join(' ');
+      }
+      nextPreview2 = line3b; nextPreview2Words = c3b;
+    }else{
+      const fit2 = fitWordsToWidth(pool, kbw);
+      const prefer = nextPreview1Words || 0;
+      line2WordCount = Math.min(Math.max(prefer>0?prefer:minKeep, fit2.length), Math.max(1, pool.length));
+      flatText = pool.slice(0, line2WordCount).join(' ');
+      nextPreview1Words = 0;
+      // 行3プレビュー
+      let c3 = 0; let line3 = "";
+      const after2 = pool.slice(line2WordCount);
+      if(after2.length){
+        const fit3 = fitWordsToWidth(after2, kbw);
+        c3 = Math.min(fit3.length, after2.length);
+        line3 = after2.slice(0, c3).join(' ');
+      }
+      nextPreview2 = line3; nextPreview2Words = c3;
+    }
     if(oldCursor > flatText.length) cursor = flatText.length;
     const newMarks = new Array(flatText.length).fill(0);
     for(let i=0;i<Math.min(oldCursor, flatText.length); i++) newMarks[i] = 1;
@@ -381,9 +418,11 @@ function advanceLine(){
     wordsOffset += (line1WordCount || 0);
     activeRow = 2;
     centeredMode = true;
+    adoptNextAsCurrent = 1; // 旧nextPreview1をそのまま現在行に
   }else{
     // 2行目分を消費して次へ（行送り）
     wordsOffset += (line2WordCount || 0);
+    adoptNextAsCurrent = 2; // 旧nextPreview2をそのまま現在行に
   }
   cursor = 0; marks = [];
   if(wordsOffset >= sourceWords.length){ nextSentence(); }
