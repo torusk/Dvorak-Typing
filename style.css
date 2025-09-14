@@ -60,6 +60,8 @@ body{
   text-align:center;
   max-width:900px; margin:0 auto;
   --line-gap: 12px;           /* 3行の縦間隔（ここを調整） */
+  --text-offset-y: -12px;     /* 文字列ブロックの縦位置（負値で上に） */
+  transform: translateY(var(--text-offset-y));
 }
 .text .char{color:#6b7280}
 .text .char.correct{color:#111}
