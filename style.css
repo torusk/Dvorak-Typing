@@ -76,6 +76,7 @@ body{
 
 /* 3行表示用 */
 .text .line{white-space:nowrap; display:block}
+.text .history .current{ text-decoration: none; } /* 履歴行には下線を出さない保険 */
 .text .line + .line{ margin-top: var(--line-gap); }
 /* 行2・行3（プレビュー）も同じ薄さで統一 */
 .text .next-line{color:var(--text-muted)}

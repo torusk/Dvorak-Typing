@@ -48,15 +48,15 @@ const EXERCISES_CLI = [
 let mode = 'en';
 let sentenceIndex = 0;
 
-// 共通：候補単語列（複数文を連結） → 画面は3行表示（行1がタイピング対象）
+// 共通：候補単語列（複数文を連結） → 画面は3行表示（常に2行目が入力中）
 let sourceWords = [];        // string[]
-let wordsOffset = 0;         // 現在の行1が始まる語インデックス
-let flatText = "";          // 行1の表示テキスト
-let cursor = 0;             // 行1内のカーソル位置（0..length）
-let marks = [];             // 0:未入力 / 1:正解 / -1:ミス（行1のみ）
-let lineWordCounts = [0,0,0]; // 行1〜行3の語数（行送り時に使用）
-let nextPreview1 = "";     // 次の行（行2）の表示キャッシュ
-let nextPreview2 = "";     // 次の行（行3）の表示キャッシュ
+let wordsOffset = 0;         // 現在の「2行目（入力中）」が始まる語インデックス
+let flatText = "";          // 2行目（入力中）のテキスト
+let cursor = 0;             // 2行目のカーソル位置（0..length）
+let marks = [];             // 0:未入力 / 1:正解 / -1:ミス（2行目のみ）
+let line2WordCount = 0;     // 現在の2行目の語数（行送り時に消費する）
+let historyHTML = "";       // 1行目に表示する直前の完成行（HTMLスナップショット）
+let nextPreview2 = "";     // 3行目（プレビュー）のテキスト
 
 // Shift系
 let shiftSticky = false;
@@ -145,7 +145,8 @@ function resolveOutput(code){
 function getKeyboardWidth(){
   if(!keyboardEl){ return Math.min(820, window.innerWidth - 16); }
   const rect = keyboardEl.getBoundingClientRect();
-  return rect.width || Math.min(820, window.innerWidth - 16);
+  const fallback = Math.min(820, window.innerWidth - 16);
+  return (rect.width && rect.width > 50) ? rect.width : fallback;
 }
 function fitWordsToWidth(words, limitPx){
   // canvas の 2D コンテキストでテキスト幅をピクセル計測
@@ -181,55 +182,72 @@ function futureWordsPool(){
   return remain.concat(nextThree);
 }
 function layoutThreeLines(){
-  // 画面幅に収まる単語で行1〜行3を構成（行1は既入力語数を維持）
+  // 画面幅に収まる単語で現在行とプレビューを構成
   const kbw = getKeyboardWidth();
   textEl.style.maxWidth = `${Math.floor(kbw)}px`;
 
   const pool = futureWordsPool();
   const minKeep = minWordsToKeepForCursor();
 
-  let off = 0;
-  // 行1
-  const fit1 = fitWordsToWidth(pool.slice(off), kbw);
-  let c1 = Math.max(minKeep, fit1.length);
-  c1 = Math.min(c1, Math.max(1, pool.length));
   const oldCursor = cursor;
-  flatText = pool.slice(off, off + c1).join(' ');
-  if(oldCursor > flatText.length) cursor = flatText.length;
-  const newMarks = new Array(flatText.length).fill(0);
-  for(let i=0;i<Math.min(oldCursor, flatText.length); i++) newMarks[i] = 1;
-  marks = newMarks;
-  off += c1;
+  if(activeRow===1){
+    // 行1を現在行として構成
+    const fit1 = fitWordsToWidth(pool, kbw);
+    line1WordCount = Math.min(Math.max(minKeep, fit1.length), Math.max(1, pool.length));
+    flatText = pool.slice(0, line1WordCount).join(' ');
+    if(oldCursor > flatText.length) cursor = flatText.length;
+    const newMarks = new Array(flatText.length).fill(0);
+    for(let i=0;i<Math.min(oldCursor, flatText.length); i++) newMarks[i] = 1;
+    marks = newMarks;
 
-  // 行2
-  let c2 = 0, line2 = "";
-  if(off < pool.length){
-    const fit2 = fitWordsToWidth(pool.slice(off), kbw);
-    c2 = Math.min(fit2.length, pool.length - off);
-    line2 = pool.slice(off, off + c2).join(' ');
-    off += c2;
+    // 行2プレビュー
+    let c2 = 0; let line2 = "";
+    const after1 = pool.slice(line1WordCount);
+    if(after1.length){
+      const fit2 = fitWordsToWidth(after1, kbw);
+      c2 = Math.min(fit2.length, after1.length);
+      line2 = after1.slice(0, c2).join(' ');
+    }
+    nextPreview1 = line2;
+
+    // 行3プレビュー
+    let c3 = 0; let line3 = "";
+    const after2 = after1.slice(c2);
+    if(after2.length){
+      const fit3 = fitWordsToWidth(after2, kbw);
+      c3 = Math.min(fit3.length, after2.length);
+      line3 = after2.slice(0, c3).join(' ');
+    }
+    nextPreview2 = line3;
+  }else{
+    // 行2を現在行として構成（履歴はhistoryHTML）
+    const fit2 = fitWordsToWidth(pool, kbw);
+    line2WordCount = Math.min(Math.max(minKeep, fit2.length), Math.max(1, pool.length));
+    flatText = pool.slice(0, line2WordCount).join(' ');
+    if(oldCursor > flatText.length) cursor = flatText.length;
+    const newMarks = new Array(flatText.length).fill(0);
+    for(let i=0;i<Math.min(oldCursor, flatText.length); i++) newMarks[i] = 1;
+    marks = newMarks;
+
+    // 行3プレビュー
+    let c3 = 0; let line3 = "";
+    const after2 = pool.slice(line2WordCount);
+    if(after2.length){
+      const fit3 = fitWordsToWidth(after2, kbw);
+      c3 = Math.min(fit3.length, after2.length);
+      line3 = after2.slice(0, c3).join(' ');
+    }
+    nextPreview2 = line3;
   }
-
-  // 行3
-  let c3 = 0, line3 = "";
-  if(off < pool.length){
-    const fit3 = fitWordsToWidth(pool.slice(off), kbw);
-    c3 = Math.min(fit3.length, pool.length - off);
-    line3 = pool.slice(off, off + c3).join(' ');
-    off += c3;
-  }
-
-  lineWordCounts = [c1, c2, c3];
-  nextPreview1 = line2; nextPreview2 = line3;
-  renderText(line2, line3);
+  renderText();
 }
 
 // ===== 描画（常に1行） =====
 // flatText を1文字ずつ <span> にし、marks[] に応じてクラスを付与。
 // CSS 側で `.char.correct` `.char.wrong` `.char.current` を色分け表示。
-function renderText(next1="", next2=""){
+function renderText(){
   if(!textEl) return;
-  let line1="";
+  let currentHtml="";
   for(let i=0;i<flatText.length;i++){
     const ch=flatText[i];
     const m=marks[i]||0;
@@ -238,14 +256,23 @@ function renderText(next1="", next2=""){
     else if(m===-1) cls+=' wrong';
     else cls+=' pending';
     if(i===cursor) cls+=' current';
-    line1 += `<span class="${cls}">${escapeHTML(ch)}</span>`;
+    currentHtml += `<span class="${cls}">${escapeHTML(ch)}</span>`;
   }
-  const n1 = escapeHTML(next1||"");
-  const n2 = escapeHTML(next2||"");
-  textEl.innerHTML = `<div class="line current">${line1}</div>`+
-                     (n1?`<div class="line next-line">${n1}</div>`:``)+
-                     (n2?`<div class="line next-line">${n2}</div>`:``);
+  if(activeRow===1){
+    const n2 = escapeHTML(nextPreview1||"");
+    const n3 = escapeHTML(nextPreview2||"");
+    textEl.innerHTML = `<div class="line current">${currentHtml}</div>`+
+                       (n2?`<div class="line next-line">${n2}</div>`:``)+
+                       (n3?`<div class="line next-line">${n3}</div>`:``);
+  }else{
+    const n3 = escapeHTML(nextPreview2||"");
+    const hist = historyHTML || "";
+    textEl.innerHTML = `<div class="line history">${hist}</div>`+
+                       `<div class="line current">${currentHtml}</div>`+
+                       (n3?`<div class="line next-line">${n3}</div>`:``);
+  }
 }
+
 
 // ===== 画像ダウンロード / 結合 / 印刷ビュー =====
 function downloadFile(url, filename){
@@ -280,19 +307,19 @@ function onChar(input, baseCode){
     const keyId = baseCode || ch.toLowerCase();
     if(keyId===' ') flashKey('space', true); else flashKey(keyId, true);
     cursor = clamp(cursor+1,0,flatText.length);
-    renderText(nextPreview1, nextPreview2);
+    renderText();
     // 行末到達時の自動遷移はしない（スペース押下で進む）
   }else{
     marks[cursor] = -1;
     const keyId = baseCode || ch.toLowerCase();
     if(keyId) flashKey(keyId, false);
-    renderText(nextPreview1, nextPreview2);
+    renderText();
   }
 }
 function onBackspace(){
   // ミス表示があればまず解除。なければ1文字戻る（正解表示も解除）
-  if(marks[cursor]===-1){ marks[cursor]=0; renderText(nextPreview1, nextPreview2); return; }
-  if(cursor>0){ cursor--; marks[cursor]=0; renderText(nextPreview1, nextPreview2); }
+  if(marks[cursor]===-1){ marks[cursor]=0; renderText(); return; }
+  if(cursor>0){ cursor--; marks[cursor]=0; renderText(); }
 }
 
 // ===== 課題選択 =====
@@ -314,6 +341,8 @@ function pickSentence(){
   wordsOffset = 0;
   cursor = 0;
   marks = [];
+  historyHTML = ""; // 履歴は初期化
+  activeRow = 1;     // 初回は1行目から入力
   layoutThreeLines();   // 3行に分割して表示
 }
 function nextSentence(){
@@ -322,16 +351,35 @@ function nextSentence(){
   pickSentence();
 }
 
-function advanceLine(){
-  // 行1を消化して次へ。バッファ末尾なら次セットへ。
-  const consume = lineWordCounts[0] || 0;
-  wordsOffset += consume;
-  cursor = 0; marks = [];
-  if(wordsOffset >= sourceWords.length){
-    nextSentence();
-  }else{
-    layoutThreeLines();
+function buildCurrentLineHTMLWithoutCursor(){
+  // 2行目（現在行）を、下線（current）なしでHTML化して履歴用に保存
+  let html="";
+  for(let i=0;i<flatText.length;i++){
+    const ch=flatText[i];
+    const m=marks[i]||0;
+    let cls='char';
+    if(m===1) cls+=' correct';
+    else if(m===-1) cls+=' wrong';
+    else cls+=' pending';
+    // 履歴には下線を含めない
+    html += `<span class=\"${cls}\">${escapeHTML(ch)}</span>`;
   }
+  return html;
+}
+function advanceLine(){
+  // activeRowに応じて処理: 1行目→2行目へ移行（スクロールなし）、以降は2行目完了でスクロール
+  historyHTML = buildCurrentLineHTMLWithoutCursor();
+  if(activeRow===1){
+    // 1行目分だけ語を消費し、以後は常に2行目で入力
+    wordsOffset += (line1WordCount || 0);
+    activeRow = 2;
+  }else{
+    // 2行目分を消費して次へ（行送り）
+    wordsOffset += (line2WordCount || 0);
+  }
+  cursor = 0; marks = [];
+  if(wordsOffset >= sourceWords.length){ nextSentence(); }
+  else { layoutThreeLines(); }
 }
 
 // ===== 初期化 =====
@@ -374,10 +422,11 @@ function init(){
       layoutThreeLines();
       cursor = clamp(typedCount, 0, flatText.length);
       for(let i=0;i<flatText.length;i++) marks[i] = (i < cursor) ? 1 : 0;
-      renderText(nextPreview1, nextPreview2);
+    renderText();
     });
   };
   window.addEventListener('resize', onResize);
-  pickSentence();
+  // 初期表示はレイアウト確定後に実行（キーボード幅が0になるのを回避）
+  requestAnimationFrame(pickSentence);
 }
 window.addEventListener('DOMContentLoaded', init);
