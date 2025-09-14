@@ -65,6 +65,10 @@ body{
 .text .char.wrong{color:var(--tile-wrong)}
 .text .char.current{position:relative; text-decoration:underline; text-underline-offset:6px}
 
+/* 3行表示用 */
+.text .line{white-space:nowrap}
+.text .next-line{color:#6b7280; opacity:0.9}
+
 
 
 /* === キーボード === */
@@ -109,4 +113,3 @@ body{
   .key{height:54px; font-size:22px} /* ← 調整ポイント（必要に応じて変えてOK） */
   .text{font-size:22px}
 }
-

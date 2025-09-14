@@ -48,11 +48,15 @@ const EXERCISES_CLI = [
 let mode = 'en';
 let sentenceIndex = 0;
 
-// 共通：候補単語列（複数要素を連結） → 画面は1行、末尾を削ってフィット
+// 共通：候補単語列（複数文を連結） → 画面は3行表示（行1がタイピング対象）
 let sourceWords = [];        // string[]
-let flatText = "";          // 1行の表示テキスト（sourceWordsの先頭から）
-let cursor = 0;             // flatText上のインデックス
-let marks = [];             // 0:未入力 / 1:正解 / -1:ミス
+let wordsOffset = 0;         // 現在の行1が始まる語インデックス
+let flatText = "";          // 行1の表示テキスト
+let cursor = 0;             // 行1内のカーソル位置（0..length）
+let marks = [];             // 0:未入力 / 1:正解 / -1:ミス（行1のみ）
+let lineWordCounts = [0,0,0]; // 行1〜行3の語数（行送り時に使用）
+let nextPreview1 = "";     // 次の行（行2）の表示キャッシュ
+let nextPreview2 = "";     // 次の行（行3）の表示キャッシュ
 
 // Shift系
 let shiftSticky = false;
@@ -165,32 +169,67 @@ function minWordsToKeepForCursor(){
   if(!prefix) return 1;
   return prefix.split(' ').length;
 }
-function layoutOneLine(){
-  // 画面幅とフォントから収まる単語数を算出し、flatTextを再構成
+function futureWordsPool(){
+  // 現在の残り語＋次セットの先読み語を結合（常に3行分確保）
+  const remain = sourceWords.slice(wordsOffset);
+  const set = currentSet();
+  const nextThree = [
+    set[(sentenceIndex+3)%set.length],
+    set[(sentenceIndex+4)%set.length],
+    set[(sentenceIndex+5)%set.length],
+  ].join(' ').split(' ');
+  return remain.concat(nextThree);
+}
+function layoutThreeLines(){
+  // 画面幅に収まる単語で行1〜行3を構成（行1は既入力語数を維持）
   const kbw = getKeyboardWidth();
-  textEl.style.maxWidth = `${Math.floor(kbw)}px`;  // 文字サイズは変えない
+  textEl.style.maxWidth = `${Math.floor(kbw)}px`;
+
+  const pool = futureWordsPool();
   const minKeep = minWordsToKeepForCursor();
-  const wordsThatFit = fitWordsToWidth(sourceWords, kbw);
-  let keepCount = Math.max(minKeep, wordsThatFit.length);
-  keepCount = Math.min(keepCount, sourceWords.length);
 
+  let off = 0;
+  // 行1
+  const fit1 = fitWordsToWidth(pool.slice(off), kbw);
+  let c1 = Math.max(minKeep, fit1.length);
+  c1 = Math.min(c1, Math.max(1, pool.length));
   const oldCursor = cursor;
-  flatText = sourceWords.slice(0, keepCount).join(' ');
+  flatText = pool.slice(off, off + c1).join(' ');
   if(oldCursor > flatText.length) cursor = flatText.length;
-
   const newMarks = new Array(flatText.length).fill(0);
   for(let i=0;i<Math.min(oldCursor, flatText.length); i++) newMarks[i] = 1;
   marks = newMarks;
+  off += c1;
 
-  renderText();
+  // 行2
+  let c2 = 0, line2 = "";
+  if(off < pool.length){
+    const fit2 = fitWordsToWidth(pool.slice(off), kbw);
+    c2 = Math.min(fit2.length, pool.length - off);
+    line2 = pool.slice(off, off + c2).join(' ');
+    off += c2;
+  }
+
+  // 行3
+  let c3 = 0, line3 = "";
+  if(off < pool.length){
+    const fit3 = fitWordsToWidth(pool.slice(off), kbw);
+    c3 = Math.min(fit3.length, pool.length - off);
+    line3 = pool.slice(off, off + c3).join(' ');
+    off += c3;
+  }
+
+  lineWordCounts = [c1, c2, c3];
+  nextPreview1 = line2; nextPreview2 = line3;
+  renderText(line2, line3);
 }
 
 // ===== 描画（常に1行） =====
 // flatText を1文字ずつ <span> にし、marks[] に応じてクラスを付与。
 // CSS 側で `.char.correct` `.char.wrong` `.char.current` を色分け表示。
-function renderText(){
+function renderText(next1="", next2=""){
   if(!textEl) return;
-  let out="";
+  let line1="";
   for(let i=0;i<flatText.length;i++){
     const ch=flatText[i];
     const m=marks[i]||0;
@@ -199,9 +238,13 @@ function renderText(){
     else if(m===-1) cls+=' wrong';
     else cls+=' pending';
     if(i===cursor) cls+=' current';
-    out += `<span class="${cls}">${escapeHTML(ch)}</span>`;
+    line1 += `<span class="${cls}">${escapeHTML(ch)}</span>`;
   }
-  textEl.innerHTML = out;
+  const n1 = escapeHTML(next1||"");
+  const n2 = escapeHTML(next2||"");
+  textEl.innerHTML = `<div class="line current">${line1}</div>`+
+                     (n1?`<div class="line next-line">${n1}</div>`:``)+
+                     (n2?`<div class="line next-line">${n2}</div>`:``);
 }
 
 // ===== 画像ダウンロード / 結合 / 印刷ビュー =====
@@ -220,7 +263,7 @@ function downloadLayouts(){
 // onChar         : 期待文字と比較し、正解なら前進 / ミスなら赤表示
 function handleVirtualKey(code){
   if(code === 'backspace') return onBackspace();
-  if(code === 'space' && cursor===flatText.length){ return nextSentence(); }
+  if(code === 'space' && cursor===flatText.length){ return advanceLine(); }
   const out = resolveOutput(code);
   if(out==null) return;
   if(out.length===1) return onChar(out, code);
@@ -237,19 +280,19 @@ function onChar(input, baseCode){
     const keyId = baseCode || ch.toLowerCase();
     if(keyId===' ') flashKey('space', true); else flashKey(keyId, true);
     cursor = clamp(cursor+1,0,flatText.length);
-    renderText();
+    renderText(nextPreview1, nextPreview2);
     // 行末到達時の自動遷移はしない（スペース押下で進む）
   }else{
     marks[cursor] = -1;
     const keyId = baseCode || ch.toLowerCase();
     if(keyId) flashKey(keyId, false);
-    renderText();
+    renderText(nextPreview1, nextPreview2);
   }
 }
 function onBackspace(){
   // ミス表示があればまず解除。なければ1文字戻る（正解表示も解除）
-  if(marks[cursor]===-1){ marks[cursor]=0; renderText(); return; }
-  if(cursor>0){ cursor--; marks[cursor]=0; renderText(); }
+  if(marks[cursor]===-1){ marks[cursor]=0; renderText(nextPreview1, nextPreview2); return; }
+  if(cursor>0){ cursor--; marks[cursor]=0; renderText(nextPreview1, nextPreview2); }
 }
 
 // ===== 課題選択 =====
@@ -268,14 +311,27 @@ function prepareSource(){
 function pickSentence(){
   // 出題の初期化。レイアウト確定後に message を消す。
   prepareSource();
+  wordsOffset = 0;
   cursor = 0;
   marks = [];
-  layoutOneLine();     // 1行に収める（末尾削除）
+  layoutThreeLines();   // 3行に分割して表示
 }
 function nextSentence(){
   const set = currentSet();
   sentenceIndex = (sentenceIndex+3) % set.length;
   pickSentence();
+}
+
+function advanceLine(){
+  // 行1を消化して次へ。バッファ末尾なら次セットへ。
+  const consume = lineWordCounts[0] || 0;
+  wordsOffset += consume;
+  cursor = 0; marks = [];
+  if(wordsOffset >= sourceWords.length){
+    nextSentence();
+  }else{
+    layoutThreeLines();
+  }
 }
 
 // ===== 初期化 =====
@@ -299,7 +355,7 @@ function init(){
     if(k==='Tab'){ e.preventDefault(); onChar(' ','tab'); onChar(' ','tab'); return; }
     if(k===' '){
       e.preventDefault();
-      if(cursor===flatText.length) return nextSentence();
+      if(cursor===flatText.length) return advanceLine();
       return onChar(' ','space');
     }
     if(k.length===1){
@@ -315,10 +371,10 @@ function init(){
     cancelAnimationFrame(rAf);
     rAf = requestAnimationFrame(()=>{
       const typedCount = cursor;
-      layoutOneLine();
+      layoutThreeLines();
       cursor = clamp(typedCount, 0, flatText.length);
       for(let i=0;i<flatText.length;i++) marks[i] = (i < cursor) ? 1 : 0;
-      renderText();
+      renderText(nextPreview1, nextPreview2);
     });
   };
   window.addEventListener('resize', onResize);
