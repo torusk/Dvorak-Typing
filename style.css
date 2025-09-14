@@ -59,6 +59,7 @@ body{
   text-overflow:clip;
   text-align:center;
   max-width:900px; margin:0 auto;
+  --line-gap: 12px;           /* 3行の縦間隔（ここを調整） */
 }
 .text .char{color:#6b7280}
 .text .char.correct{color:#111}
@@ -66,7 +67,8 @@ body{
 .text .char.current{position:relative; text-decoration:underline; text-underline-offset:6px}
 
 /* 3行表示用 */
-.text .line{white-space:nowrap}
+.text .line{white-space:nowrap; display:block}
+.text .line + .line{ margin-top: var(--line-gap); }
 .text .next-line{color:#6b7280; opacity:0.9}
 
 
