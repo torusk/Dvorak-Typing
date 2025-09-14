@@ -62,6 +62,7 @@ let shiftPhysical = false;
 const textEl = document.getElementById("text");
 const keyboardEl = document.getElementById("keyboard");
 const modeSel = document.getElementById("modeSelect");
+const dlBtn = document.getElementById("dlBtn");
 
 // ===== ユーティリティ =====
 // clamp         : 数値の範囲制限
@@ -203,6 +204,17 @@ function renderText(){
   textEl.innerHTML = out;
 }
 
+// ===== 画像ダウンロード / 結合 / 印刷ビュー =====
+function downloadFile(url, filename){
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; a.style.display='none';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function downloadLayouts(){
+  // 単一PDFをダウンロード
+  downloadFile('assets/Dvorak-keyboard-A4.pdf','Dvorak-keyboard-A4.pdf');
+}
+
 // ===== 入力処理 =====
 // handleVirtualKey: 仮想キーの押下を resolve → onChar へ
 // onChar         : 期待文字と比較し、正解なら前進 / ミスなら赤表示
@@ -274,6 +286,9 @@ function init(){
   if(modeSel){
     modeSel.addEventListener('change', ()=>{ mode = modeSel.value; sentenceIndex=0; pickSentence(); });
   }
+  if(dlBtn){
+    dlBtn.addEventListener('click', downloadLayouts);
+  }
 
   // 物理キーボード
   window.addEventListener('keydown',(e)=>{
@@ -307,7 +322,6 @@ function init(){
     });
   };
   window.addEventListener('resize', onResize);
-
   pickSentence();
 }
 window.addEventListener('DOMContentLoaded', init);
