@@ -313,6 +313,42 @@ function renderText(){
                        `<div class="line current">${currentHtml}</div>`+
                        (n3?`<div class="line next-line">${n3}</div>`:``);
   }
+  // テキスト再描画後に次キーの予告ハイライトを更新
+  updateNextKeyHint();
+}
+
+// ===== 次キー予告ハイライト =====
+function clearKeyHints(){
+  if(!keyboardEl) return;
+  keyboardEl.querySelectorAll('.key.hint, .key.hint-aux').forEach(el=>{
+    el.classList.remove('hint','hint-aux');
+  });
+}
+function hasBaseKey(code){
+  return DVORAK_NUMBER_ROW.includes(code) || DVORAK_ROW1.includes(code) || DVORAK_ROW2.includes(code) || DVORAK_ROW3.includes(code) || code==='space' || code==='tab' || code==='backspace' || code==='enter' || code==='shift';
+}
+function computeKeyForChar(ch){
+  if(ch===' ') return {code:'space', needShift:false};
+  if(/^[a-z]$/.test(ch)) return {code:ch, needShift:false};
+  if(/^[A-Z]$/.test(ch)) return {code:ch.toLowerCase(), needShift:true};
+  // 記号: Shiftで生成される場合は逆引き、そうでなければ素の記号
+  if(REVERSE_SHIFT_MAP[ch]) return {code:REVERSE_SHIFT_MAP[ch], needShift:true};
+  if(hasBaseKey(ch)) return {code:ch, needShift:false};
+  // 未対応文字は予告しない
+  return null;
+}
+function updateNextKeyHint(){
+  clearKeyHints();
+  if(!keyboardEl) return;
+  const expected = flatText[cursor];
+  if(!expected) return;
+  const map = computeKeyForChar(expected);
+  if(!map) return;
+  const mainKey = getKeyEl(map.code);
+  if(mainKey) mainKey.classList.add('hint');
+  if(map.needShift){
+    keyboardEl.querySelectorAll('[data-key="shift"]').forEach(el=> el.classList.add('hint-aux'));
+  }
 }
 
 

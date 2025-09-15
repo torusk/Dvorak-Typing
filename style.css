@@ -15,6 +15,10 @@
   /* 明るい緑（テキスト/キーの正解色に共通で使用） */
   --accent-green:#22c55e; /* 調整ポイント: もう少し明るい→ #34d399 / 濃い→ #16a34a */
   --key-correct:var(--accent-green);
+  /* 予告ハイライト（薄いライトグリーン） */
+  /* color-mix が未対応の環境では後続の outline で視認性を担保 */
+  --key-hint-bg: color-mix(in srgb, var(--accent-green) 24%, white);
+  --key-hint-bg-aux: color-mix(in srgb, var(--accent-green) 12%, white);
   --key-present:#c9b458;
   --key-absent:#3a3a3c;
   --tile-wrong:#b00020;
@@ -109,6 +113,19 @@ body{
   background:var(--key-bg);
   color:var(--key-fg);
   outline:3px solid #000; /* 枠色: 黒 */
+  outline-offset:0;
+}
+
+/* 予告ハイライト（次に押すべきキー） */
+.key.hint{
+  background:var(--key-hint-bg);
+  outline:2px solid var(--accent-green);
+  outline-offset:0;
+}
+/* 補助キー（Shift 等）はさらに薄く */
+.key.hint-aux{
+  background:var(--key-hint-bg-aux);
+  outline:2px dashed var(--accent-green);
   outline-offset:0;
 }
 
