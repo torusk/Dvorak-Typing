@@ -18,11 +18,13 @@
       <h1 class="title">Dvorak Typing</h1>
       <!-- 基本操作: リセット/スキップ と 練習モードの切替 -->
       <div class="controls">
-        <label class="file-picker">
-          教材読み込み:
-          <input id="filePicker" type="file" accept=".txt" />
+        <label class="mode">
+          練習モード:
+          <select id="modeSelect">
+            <option value="en" selected>英文</option>
+            <option value="cli">CLI</option>
+          </select>
         </label>
-        <span id="fileStatus" class="file-status">未選択</span>
         <button id="dlBtn" class="btn" type="button" title="Dvorak配列のA4画像をダウンロード">Dvorak配列DL</button>
       </div>
     </header>
