@@ -14,26 +14,36 @@ const DVORAK_ROW2 = ["a","o","e","u","i","d","h","t","n","s","-"];
 const DVORAK_ROW3 = [";","q","j","k","x","b","m","w","v","z"];
 
 // ===== 課題文 =====
+const CHUNK_SIZE = 3; // 画面表示に使用するセット数
+
 // ===== 状態 =====
-// sourceWords    : 教材本文の全単語を線形に保持
+// sentenceIndex  : 出題の進行位置（CHUNK_SIZE単位で進める）
+// sourceWords    : 出題候補（複数文を空白で連結→単語配列）
 // flatText       : 実際に1行表示される文字列（画面幅に合わせて末尾カット）
 // cursor         : flatText 上での現在位置（0..length）
 // marks[]        : 0=未入力 / 1=正解 / -1=ミス（renderTextで色分け）
 // shiftSticky    : 仮想Shiftのトグル（1打鍵で自動解除）
 // shiftPhysical  : 物理Shiftの押下状態
+let sentenceIndex = 0;
 let currentFileName = '';
 
-// 共通：候補単語列（教材内の本文全体を単語化）
+// 共通：候補単語列（複数文を連結） → 画面は3行表示（常に2行目が入力中）
 let exercises = [];          // string[]（教材テキスト）
-let sourceWords = [];        // string[]（本文の単語列）
-let wordsOffset = 0;         // 現在行の先頭に対応する語インデックス
-let flatText = "";          // 現在行のテキスト
-let cursor = 0;              // 現在行のカーソル位置（0..length）
-let marks = [];              // 0:未入力 / 1:正解 / -1:ミス
-let currentWordCount = 0;    // 現在行に含まれる語数
-let historyHTML = "";       // 直前に完了した行のHTML（履歴表示用）
-let nextPreview1 = "";      // 次行のプレビューテキスト
-let nextPreview2 = "";      // 次々行のプレビューテキスト
+let sourceWords = [];        // string[]（現在チャンクの単語列）
+let wordsOffset = 0;         // 現在の「2行目（入力中）」が始まる語インデックス
+let flatText = "";          // 2行目（入力中）のテキスト
+let cursor = 0;              // 2行目のカーソル位置（0..length）
+let marks = [];              // 0:未入力 / 1:正解 / -1:ミス（2行目のみ）
+let line1WordCount = 0;      // 現在の1行目（activeRow=1）の語数
+let line2WordCount = 0;      // 現在の2行目（activeRow=2）の語数
+let historyHTML = "";       // 1行目に表示する直前の完成行（HTMLスナップショット）
+let nextPreview1 = "";      // 2行目（プレビュー）のテキスト（activeRow=1時）
+let nextPreview1Words = 0;   // 2行目プレビューの語数（1→2行目移行直後に固定採用）
+let nextPreview2 = "";      // 3行目（プレビュー）のテキスト
+let nextPreview2Words = 0;   // 3行目プレビューの語数
+let activeRow = 1;           // 1=初回は1行目から入力 / 2=以後は常に2行目入力
+let centeredMode = false;    // 一度2行目に入ったら以後は2行目を現在行に
+let adoptNextAsCurrent = 0;  // 0:通常 1:旧nextPreview1を現在行に 2:旧nextPreview2を現在行に
 
 // Shift系
 let shiftSticky = false;
@@ -141,10 +151,13 @@ function loadFromFile(file){
 
 function applyDataset(blocks){
   exercises = blocks.map(b=>b.text);
+  sentenceIndex = 0;
   wordsOffset = 0;
   cursor = 0;
   marks = [];
-  currentWordCount = 0;
+  activeRow = 1;
+  centeredMode = false;
+  adoptNextAsCurrent = 0;
   historyHTML = "";
   if(!exercises.length){
     showStatusMessage('英語テキストが見つかりません。');
@@ -237,72 +250,134 @@ function fitWordsToWidth(words, limitPx){
   }
   return words.slice(0, Math.max(1, count)); // 最低1語は表示
 }
-function fitWordsToWidthWithMinimum(words, limitPx, minimum){
-  if(!words.length) return [];
-  const result = fitWordsToWidth(words, limitPx);
-  if(result.length >= minimum) return result;
-  if(words.length) return words.slice(0, Math.min(words.length, Math.max(minimum, 1)));
-  return result;
-}
-function minWordsToKeepForCursor(text, caret){
+function minWordsToKeepForCursor(){
   // カーソルより左側に含まれる単語数（最低保持数）を計算
-  const prefix = text.slice(0, caret);
+  const prefix = flatText.slice(0, cursor);
+  // 新しい行の先頭では 0 語保持（再出現を防止）
   if(!prefix) return 0;
   return prefix.split(' ').length;
 }
 function futureWordsPool(){
-  // これ以降に入力すべき語を順番通りに返す（現在行＋プレビュー用）
-  return sourceWords.slice(wordsOffset);
+  // 現在の残り語＋次セットの先読み語を結合（常に3行分確保）
+  const remainWords = sourceWords.slice(wordsOffset);
+  const set = currentSet();
+  const extraWords = [];
+  if(set.length){
+    const start = sentenceIndex + CHUNK_SIZE;
+    for(let i=0;i<CHUNK_SIZE;i++){
+      const idx = start + i;
+      if(idx >= set.length) break;
+      extraWords.push(...wordsFromText(set[idx]));
+    }
+  }
+  return remainWords.concat(extraWords);
 }
 function layoutThreeLines(){
+  // 画面幅に収まる単語で現在行とプレビューを構成
   const keyboardWidth = getKeyboardWidth();
   const targetWidth = Math.max(320, Math.floor(keyboardWidth * 0.82));
   textEl.style.maxWidth = `${targetWidth}px`;
   textEl.style.width = `${targetWidth}px`;
 
   const poolWords = futureWordsPool();
-  if(!poolWords.length){
-    flatText = "";
-    currentWordCount = 0;
-    marks = [];
-    nextPreview1 = "";
-    nextPreview2 = "";
-    renderText();
-    return;
-  }
+  const minKeep = minWordsToKeepForCursor();
 
   const oldCursor = cursor;
-  const oldFlat = flatText;
-  const minKeep = minWordsToKeepForCursor(oldFlat, oldCursor);
-
-  const currentWords = fitWordsToWidthWithMinimum(poolWords, targetWidth, Math.max(1, minKeep));
-  currentWordCount = currentWords.length;
-  flatText = currentWords.join(' ');
-
-  if(oldCursor > flatText.length) cursor = flatText.length;
-
-  const prevMarks = marks;
   const rebuildMarks = ()=>{
     const arr = new Array(flatText.length).fill(0);
-    for(let i=0;i<flatText.length;i++){
-      if(i<cursor) arr[i] = (prevMarks[i]===-1) ? -1 : 1;
-    }
+    for(let i=0;i<Math.min(oldCursor, flatText.length); i++) arr[i] = 1;
     marks = arr;
   };
-  rebuildMarks();
 
-  const afterCurrent = poolWords.slice(currentWordCount);
-  const preview1Words = fitWordsToWidth(afterCurrent, targetWidth);
-  nextPreview1 = preview1Words.join(' ');
+  if(activeRow===1){
+    const fit1 = fitWordsToWidth(poolWords, targetWidth);
+    const poolLength = poolWords.length || 1;
+    line1WordCount = Math.min(Math.max(minKeep, fit1.length), Math.max(1, poolLength));
+    flatText = poolWords.slice(0, line1WordCount).join(' ');
+    if(oldCursor > flatText.length) cursor = flatText.length;
+    rebuildMarks();
 
-  const afterPreview1 = afterCurrent.slice(preview1Words.length);
-  const preview2Words = fitWordsToWidth(afterPreview1, targetWidth);
-  nextPreview2 = preview2Words.join(' ');
+    const after1Words = poolWords.slice(line1WordCount);
 
+    let c2 = 0; let line2 = "";
+    if(after1Words.length){
+      const fit2 = fitWordsToWidth(after1Words, targetWidth);
+      c2 = Math.min(fit2.length, after1Words.length);
+      line2 = after1Words.slice(0, c2).join(' ');
+    }
+    nextPreview1 = line2;
+    nextPreview1Words = c2;
+
+    const after2Words = after1Words.slice(c2);
+    let c3 = 0; let line3 = "";
+    if(after2Words.length){
+      const fit3 = fitWordsToWidth(after2Words, targetWidth);
+      c3 = Math.min(fit3.length, after2Words.length);
+      line3 = after2Words.slice(0, c3).join(' ');
+    }
+    nextPreview2 = line3;
+    nextPreview2Words = c3;
+  }else{
+    const poolLength = poolWords.length || 1;
+    if(adoptNextAsCurrent===1){
+      line2WordCount = Math.min(nextPreview1Words||0, Math.max(1, poolLength));
+      flatText = nextPreview1 || poolWords.slice(0, line2WordCount).join(' ');
+      adoptNextAsCurrent = 0; nextPreview1Words = 0;
+    }else if(adoptNextAsCurrent===2){
+      line2WordCount = Math.min(nextPreview2Words||0, Math.max(1, poolLength));
+      flatText = nextPreview2 || poolWords.slice(0, line2WordCount).join(' ');
+      adoptNextAsCurrent = 0;
+      const after2bWords = poolWords.slice(line2WordCount);
+      let c3b = 0; let line3b = "";
+      if(after2bWords.length){
+      const fit3b = fitWordsToWidth(after2bWords, targetWidth);
+        c3b = Math.min(fit3b.length, after2bWords.length);
+        line3b = after2bWords.slice(0, c3b).join(' ');
+      }
+      nextPreview2 = line3b; nextPreview2Words = c3b;
+    }else{
+      const fit2 = fitWordsToWidth(poolWords, targetWidth);
+      const prefer = nextPreview1Words || 0;
+      line2WordCount = Math.min(Math.max(prefer>0?prefer:minKeep, fit2.length), Math.max(1, poolLength));
+      flatText = poolWords.slice(0, line2WordCount).join(' ');
+      nextPreview1Words = 0;
+      const after2 = poolWords.slice(line2WordCount);
+      let c3 = 0; let line3 = "";
+      if(after2.length){
+      const fit3 = fitWordsToWidth(after2, targetWidth);
+        c3 = Math.min(fit3.length, after2.length);
+        line3 = after2.slice(0, c3).join(' ');
+      }
+      nextPreview2 = line3; nextPreview2Words = c3;
+    }
+
+    if(oldCursor > flatText.length) cursor = flatText.length;
+    rebuildMarks();
+
+    const afterCurrentWords = poolWords.slice(line2WordCount);
+    let c2 = 0; let line2 = "";
+    if(afterCurrentWords.length){
+      const fitNext = fitWordsToWidth(afterCurrentWords, targetWidth);
+      c2 = Math.min(fitNext.length, afterCurrentWords.length);
+      line2 = afterCurrentWords.slice(0, c2).join(' ');
+    }
+    nextPreview1 = line2;
+    nextPreview1Words = c2;
+
+    const after3Words = afterCurrentWords.slice(c2);
+    let c3 = 0; let line3 = "";
+    if(after3Words.length){
+      const fit3 = fitWordsToWidth(after3Words, targetWidth);
+      c3 = Math.min(fit3.length, after3Words.length);
+      line3 = after3Words.slice(0, c3).join(' ');
+    }
+    nextPreview2 = line3;
+    nextPreview2Words = c3;
+  }
   renderText();
 }
 
-// ===== 描画（履歴＋現在＋プレビュー） =====
+// ===== 描画（常に1行） =====
 // flatText を1文字ずつ <span> にし、marks[] に応じてクラスを付与。
 // CSS 側で `.char.correct` `.char.wrong` `.char.current` を色分け表示。
 function renderText(){
@@ -325,15 +400,19 @@ function renderText(){
     return `<div class="line ${className}">${content}</div>`;
   };
 
-  const parts = [];
-  if(historyHTML) parts.push(renderLine(historyHTML, 'history', true));
-  if(currentHtml) parts.push(renderLine(currentHtml, 'current', true));
-  if(nextPreview1) parts.push(renderLine(nextPreview1, 'next-line'));
-  if(nextPreview2) parts.push(renderLine(nextPreview2, 'next-line'));
-  if(!parts.length){
-    parts.push(renderLine('すべて完了しました。', 'status'));
+  if(activeRow===1){
+    const parts = [];
+    parts.push(renderLine(currentHtml, 'current', true));
+    if(nextPreview1) parts.push(renderLine(nextPreview1, 'next-line'));
+    if(nextPreview2) parts.push(renderLine(nextPreview2, 'next-line'));
+    textEl.innerHTML = parts.join('');
+  }else{
+    const parts = [];
+    if(historyHTML) parts.push(renderLine(historyHTML, 'history', true));
+    parts.push(renderLine(currentHtml, 'current', true));
+    if(nextPreview2) parts.push(renderLine(nextPreview2, 'next-line'));
+    textEl.innerHTML = parts.join('');
   }
-  textEl.innerHTML = parts.join('');
   // テキスト再描画後に次キーの予告ハイライトを更新
   updateNextKeyHint();
 }
@@ -461,12 +540,27 @@ function prepareSource(){
     sourceWords = [];
     return;
   }
-  const flattened = [];
-  set.forEach(text=>{
-    const words = wordsFromText(text);
-    if(words.length) flattened.push(...words);
+  if(sentenceIndex >= set.length){
+    sentenceIndex = 0;
+  }
+  const chunk = [];
+  for(let i=0;i<CHUNK_SIZE;i++){
+    const idx = sentenceIndex + i;
+    if(idx >= set.length) break;
+    chunk.push(set[idx]);
+  }
+  if(!chunk.length){
+    chunk.push(set[0]);
+    sentenceIndex = 0;
+  }
+  sourceWords = [];
+  chunk.forEach((text)=>{
+    sourceWords.push(...wordsFromText(text));
   });
-  sourceWords = flattened;
+  if(!sourceWords.length){
+    sentenceIndex = (sentenceIndex + CHUNK_SIZE < set.length) ? sentenceIndex + CHUNK_SIZE : 0;
+    prepareSource();
+  }
 }
 function pickSentence(){
   const set = currentSet();
@@ -482,12 +576,26 @@ function pickSentence(){
   wordsOffset = 0;
   cursor = 0;
   marks = [];
-  currentWordCount = 0;
-  historyHTML = "";
-  layoutThreeLines();
+  // 履歴は原則保持（案A）。初回のみ空にする。
+  if(!centeredMode){
+    historyHTML = "";
+  }
+  // 初回のみ1行目から。2行目に入ったことがあれば以後は2行目固定
+  activeRow = centeredMode ? 2 : 1;
+  layoutThreeLines();   // 3行に分割して表示
 }
+function nextSentence(){
+  const set = currentSet();
+  if(!set.length) return;
+  sentenceIndex += CHUNK_SIZE;
+  if(sentenceIndex >= set.length){
+    sentenceIndex = 0;
+  }
+  pickSentence();
+}
+
 function buildCurrentLineHTMLWithoutCursor(){
-  // 現在行を下線なしでHTML化し、履歴表示に転用
+  // 2行目（現在行）を、下線（current）なしでHTML化して履歴用に保存
   let html="";
   for(let i=0;i<flatText.length;i++){
     const ch=flatText[i];
@@ -502,22 +610,22 @@ function buildCurrentLineHTMLWithoutCursor(){
   return html;
 }
 function advanceLine(){
-  // 現在行を履歴に送り、残りの本文から次行を生成
+  // activeRowに応じて処理: 1行目→2行目へ移行（スクロールなし）、以降は2行目完了でスクロール
   historyHTML = buildCurrentLineHTMLWithoutCursor();
-  wordsOffset += currentWordCount;
-  cursor = 0;
-  marks = [];
-  currentWordCount = 0;
-
-  if(wordsOffset >= sourceWords.length){
-    flatText = "";
-    nextPreview1 = "";
-    nextPreview2 = "";
-    renderText();
-    showStatusMessage('テキストの入力が完了しました。');
-    return;
+  if(activeRow===1){
+    // 1行目分だけ語を消費し、以後は常に2行目で入力
+    wordsOffset += (line1WordCount || 0);
+    activeRow = 2;
+    centeredMode = true;
+    adoptNextAsCurrent = 1; // 旧nextPreview1をそのまま現在行に
+  }else{
+    // 2行目分を消費して次へ（行送り）
+    wordsOffset += (line2WordCount || 0);
+    adoptNextAsCurrent = 2; // 旧nextPreview2をそのまま現在行に
   }
-  layoutThreeLines();
+  cursor = 0; marks = [];
+  if(wordsOffset >= sourceWords.length){ nextSentence(); }
+  else { layoutThreeLines(); }
 }
 
 // ===== 初期化 =====
@@ -565,7 +673,7 @@ function init(){
       layoutThreeLines();
       cursor = clamp(typedCount, 0, flatText.length);
       for(let i=0;i<flatText.length;i++) marks[i] = (i < cursor) ? 1 : 0;
-      renderText();
+    renderText();
     });
   };
   window.addEventListener('resize', onResize);
