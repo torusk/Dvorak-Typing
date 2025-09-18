@@ -1,0 +1,147 @@
+/*
+  style.css: レイアウトと配色を定義。
+  - 画面構成: 上部ヘッダー / 中央にテキスト / 下部に仮想キーボード
+  - 文字色のルールは `.text .char.*` に集約（JSがクラス付与）
+    * `.char`        : 未入力（灰）
+    * `.char.correct`: 正解（黒）
+    * `.char.wrong`  : ミス（赤）
+    * `.char.current`: 現在位置の下線
+  - 可読性を優先した控えめな配色。全体の雰囲気は既定のまま維持。
+*/
+:root{
+  --bg:#fafafa;
+  --key-bg:#d3d6da;
+  --key-fg:#111;
+  /* 明るい緑（テキスト/キーの正解色に共通で使用） */
+  --accent-green:#22c55e; /* 調整ポイント: もう少し明るい→ #34d399 / 濃い→ #16a34a */
+  --key-correct:var(--accent-green);
+  /* 予告ハイライト（薄いライトグリーン） */
+  /* color-mix が未対応の環境では後続の outline で視認性を担保 */
+  --key-hint-bg: color-mix(in srgb, var(--accent-green) 24%, white);
+  --key-hint-bg-aux: color-mix(in srgb, var(--accent-green) 12%, white);
+  --key-present:#c9b458;
+  --key-absent:#3a3a3c;
+  --tile-wrong:#b00020;
+  /* 未入力テキストの基準色（3行共通）。ここを薄く/濃くすれば全体が揃います */
+  --text-muted:#c3c9d1;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif;
+  color:#111;
+  background:var(--bg);
+  display:flex;
+  flex-direction:column;
+}
+
+.app-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 12px;
+  border-bottom:1px solid #e5e7eb;
+  background:#fff;
+}
+.title{font-size:18px;margin:0}
+.btn{
+  appearance:none;border:1px solid #e5e7eb;background:#fff;color:#111;
+  padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:600
+}
+.btn:active{transform:translateY(1px)}
+.controls{display:flex;gap:12px;align-items:center}
+.file-picker{display:flex;flex-direction:column;font-size:14px;font-weight:600;gap:4px}
+.file-picker input{max-width:220px}
+.file-status{font-size:13px;color:#6b7280;font-weight:500}
+
+.game{
+  max-width:920px; margin:0 auto; padding:24px; width:100%; flex:1;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;
+}
+
+/* === 表示テキスト（常に1行） === */
+.text{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size:28px; line-height:1.6; letter-spacing:0.2px;
+  white-space:nowrap;          /* 必ず1行 */
+  overflow:hidden;             /* 幅からはみ出る分はJS側で単語削除 */
+  text-overflow:clip;
+  /* 中央揃え→左揃え。キーボードと同じ左端に合わせる */
+  text-align:left;
+  max-width:900px; margin:0 auto;
+  --line-gap: 12px;           /* 3行の縦間隔（ここを調整） */
+  --text-offset-y: -12px;     /* 文字列ブロックの縦位置（負値で上に） */
+  transform: translateY(var(--text-offset-y));
+}
+.text .char{color:var(--text-muted)}       /* 未入力の基準色（行1） */
+.text .char.pending{color:var(--text-muted)}
+.text .char.correct{color:#111}           /* 入力済み（正解）は黒に */
+.text .char.wrong{color:var(--tile-wrong)}
+.text .char.current{position:relative; text-decoration:underline; text-underline-offset:6px; text-decoration-color:var(--accent-green)}
+
+/* 3行表示用 */
+.text .line{white-space:nowrap; display:block}
+.text .history .current{ text-decoration: none; } /* 履歴行には下線を出さない保険 */
+.text .line + .line{ margin-top: var(--line-gap); }
+/* 行2・行3（プレビュー）も同じ薄さで統一 */
+.text .next-line{color:var(--text-muted)}
+
+
+
+/* === キーボード === */
+.keyboard-wrapper{background:var(--bg); border-top:none; padding:10px 8px; width:100%; display:flex; justify-content:center}
+.keyboard{display:flex; flex-direction:column; gap:10px; width:100%; max-width:820px}
+.row{display:flex; gap:6px; justify-content:center}
+
+.key{
+  user-select:none;
+  background:var(--key-bg); color:var(--key-fg);
+  border:none; border-radius:6px; height:60px; min-width:46px;
+  padding:0 10px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+
+  /* ===== CHANGED: ラベルの“黄金比”サイズに微調整 =====
+     以前より小さめ：読みやすさとバランスを両立
+     必要なら 22px〜26px の範囲で微調整してください。 */
+  font-weight:800;
+  font-size:19px;        /* ← 調整ポイント（前回28px → 24px） */
+  letter-spacing:0.25px; /* ← 少しだけ広げる。詰めたい場合は 0 に */
+}
+.key.wide{min-width:84px}
+.key.space{min-width:50vw}
+.key.active{
+  /* 背景色はそのまま（灰色）。有効時は太い枠線で強調 */
+  background:var(--key-bg);
+  color:var(--key-fg);
+  outline:3px solid #000; /* 枠色: 黒 */
+  outline-offset:0;
+}
+
+/* 予告ハイライト（次に押すべきキー） */
+.key.hint{
+  background:var(--key-hint-bg);
+  outline:2px solid var(--accent-green);
+  outline-offset:0;
+}
+/* 補助キー（Shift 等）はさらに薄く */
+.key.hint-aux{
+  background:var(--key-hint-bg-aux);
+  outline:2px dashed var(--accent-green);
+  outline-offset:0;
+}
+
+.mode select{
+  height:32px; border:1px solid #e5e7eb; border-radius:6px; padding:0 8px; font-weight:600;
+}
+
+.key.flash-correct{background:var(--key-correct) !important; color:#fff}
+.key.flash-wrong{background:var(--tile-wrong) !important; color:#fff}
+
+/* ===== CHANGED: スモールスクリーン時も“見た目バランス”優先 =====
+   さらに小さい端末向けに2ptだけ下げています。 */
+@media (max-width:420px){
+  .key{height:54px; font-size:22px} /* ← 調整ポイント（必要に応じて変えてOK） */
+  .text{font-size:22px}
+}
