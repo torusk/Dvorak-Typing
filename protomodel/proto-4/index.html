@@ -1,26 +1,15 @@
+<!--
+  アプリ本体のHTML。
+  - ヘッダー: タイトル/操作ボタン/モード選択
+  - メイン: タイプ対象テキスト、状態メッセージ、仮想キーボード
+  スタイルは style.css、動作は main.js が担当。
+-->
 <!doctype html>
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Dvorak Typing Game</title>
-
-    <!-- Open Graph / Discord / Slack -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Dvorakタイピング練習" />
-    <meta property="og:title" content="Dvorakタイピング練習ツール" />
-    <meta property="og:description" content="QWERTYより快適で正確！ブラウザでDvorak配列のタイピングを練習できます。" />
-    <meta property="og:url" content="https://dvorak-typing.vercel.app/" />
-    <meta property="og:image" content="https://dvorak-typing.vercel.app/og-image-dv.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-
-    <!-- Twitter / X -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Dvorakタイピング練習ツール" />
-    <meta name="twitter:description" content="QWERTYより快適で正確！ブラウザでDvorak配列のタイピングを練習できます。" />
-    <meta name="twitter:image" content="https://dvorak-typing.vercel.app/og-image-dv.png" />
-
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -40,13 +29,14 @@
 
     <!-- メイン領域：テキスト・仮想キーボード -->
     <main class="game" aria-live="polite">
+      <!-- タイプ対象のテキスト。main.js の renderText() で1文字ずつ構築される -->
       <section id="text" class="text" aria-label="タイプ対象の英文"></section>
+      <!-- 画面下部の仮想キーボード。main.js の buildKeyboard() でDOM生成 -->
       <footer class="keyboard-wrapper" aria-label="Dvorak キーボード">
         <div id="keyboard" class="keyboard"></div>
       </footer>
     </main>
-
     <noscript>このアプリはJavaScriptが必要です。</noscript>
     <script src="main.js" defer></script>
   </body>
-</html>
+  </html>
