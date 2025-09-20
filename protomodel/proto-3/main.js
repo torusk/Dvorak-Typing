@@ -21,8 +21,6 @@ const DVORAK_ROW3 = [";","q","j","k","x","b","m","w","v","z"];
 // marks[]        : 0=未入力 / 1=正解 / -1=ミス（renderTextで色分け）
 // shiftSticky    : 仮想Shiftのトグル（1打鍵で自動解除）
 // shiftPhysical  : 物理Shiftの押下状態
-const DEFAULT_TEXT_PATH = 'default.txt';
-const DEFAULT_TEXT_FALLBACK = '## Presentation01\nBecause Japan is surrounded by the sea, and 67% of its land area is mountainous, there are numerous scenic spots in Japan.';
 let currentFileName = '';
 
 // 共通：候補単語列（教材内の本文全体を単語化）
@@ -36,10 +34,6 @@ let currentWordCount = 0;    // 現在行に含まれる語数
 let historyHTML = "";       // 直前に完了した行のHTML（履歴表示用）
 let nextPreview1 = "";      // 次行のプレビューテキスト
 let nextPreview2 = "";      // 次々行のプレビューテキスト
-
-let typingStartTime = null;  // タイピング開始時刻（ms）
-let typingEndTime = null;    // タイピング完了時刻（ms）
-let totalRequiredChars = 0;  // 教材全体の入力すべき文字数（スペース含む）
 
 // Shift系
 let shiftSticky = false;
@@ -62,59 +56,6 @@ const cssEscape = (s)=> (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).r
 const SHIFT_MAP = {"1":"!","2":"@","3":"#","4":"$","5":"%","6":"^","7":"&","8":"*","9":"(","0":")","[":"{","]":"}","`":"~","-":"_","=":"+","/":"?","\\":"|",";":":",",":"<",".":">","'":"\""};
 const REVERSE_SHIFT_MAP = Object.fromEntries(Object.entries(SHIFT_MAP).map(([k,v])=>[v,k]));
 function escapeHTML(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function nowMs(){
-  return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-}
-function resetTypingMetrics(){
-  typingStartTime = null;
-  typingEndTime = null;
-}
-function ensureTypingStarted(){
-  if(typingStartTime == null){
-    typingStartTime = nowMs();
-  }
-}
-function markTypingCompleted(){
-  if(typingStartTime == null) return null;
-  if(typingEndTime == null){
-    typingEndTime = nowMs();
-  }
-  return typingEndTime - typingStartTime;
-}
-function formatDuration(ms){
-  if(!(ms >= 0)) return '0秒';
-  if(ms < 60000){
-    const seconds = ms / 1000;
-    const digits = seconds < 10 ? 2 : 1;
-    const display = Number(seconds.toFixed(digits)).toString();
-    return `${display}秒`;
-  }
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const parts = [];
-  if(hours) parts.push(`${hours}時間`);
-  parts.push(`${minutes}分`);
-  parts.push(`${seconds}秒`);
-  return parts.join('');
-}
-function buildCompletionSummary(){
-  const elapsed = markTypingCompleted();
-  if(elapsed == null) return '';
-  const durationLabel = formatDuration(elapsed);
-  let summary = ` 所要 ${durationLabel}`;
-  if(totalRequiredChars <= 0 || elapsed <= 0){
-    summary += ' / WPM算出不可';
-  }else{
-    const minutes = elapsed / 60000;
-    const rawWpm = minutes > 0 ? (totalRequiredChars / 5) / minutes : 0;
-    const rounded = Math.round(rawWpm * 10) / 10;
-    summary += ` / ${rounded.toFixed(1)} WPM`;
-  }
-  return summary;
-}
 
 // ===== データ読み込み =====
 function showStatusMessage(message){
@@ -166,8 +107,6 @@ function loadFromFile(file){
   if(!file){
     currentFileName = '';
     exercises = [];
-    resetTypingMetrics();
-    totalRequiredChars = 0;
     showStatusMessage('テキストファイルを選択してください。');
     setFileStatus('未選択');
     return;
@@ -200,44 +139,6 @@ function loadFromFile(file){
   reader.readAsText(file);
 }
 
-function loadDefaultText(){
-  if(!DEFAULT_TEXT_PATH) return;
-  const applyText = (text)=>{
-    const base = DEFAULT_TEXT_PATH.replace(/\.[^.]+$/, '') || 'Text';
-    const blocks = parseCompiledText(text, base);
-    if(!blocks.length) throw new Error('Dataset is empty');
-    currentFileName = DEFAULT_TEXT_PATH;
-    applyDataset(blocks);
-    setFileStatus(`${DEFAULT_TEXT_PATH}`);
-  };
-
-  setFileStatus(`${DEFAULT_TEXT_PATH} を読み込み中...`);
-  showStatusMessage('読み込み中...');
-  fetch(DEFAULT_TEXT_PATH)
-    .then(res=>{
-      if(!res.ok) throw new Error(`Failed to load ${DEFAULT_TEXT_PATH}`);
-      return res.text();
-    })
-    .then(applyText)
-    .catch(err=>{
-      console.error(err);
-      if(DEFAULT_TEXT_FALLBACK){
-        try{
-          applyText(DEFAULT_TEXT_FALLBACK);
-          return;
-        }catch(fallbackErr){
-          console.error(fallbackErr);
-        }
-      }
-      currentFileName = '';
-      exercises = [];
-      resetTypingMetrics();
-      totalRequiredChars = 0;
-      showStatusMessage('テキストファイルを選択してください。');
-      setFileStatus('未選択');
-    });
-}
-
 function applyDataset(blocks){
   exercises = blocks.map(b=>b.text);
   wordsOffset = 0;
@@ -245,8 +146,6 @@ function applyDataset(blocks){
   marks = [];
   currentWordCount = 0;
   historyHTML = "";
-  resetTypingMetrics();
-  totalRequiredChars = 0;
   if(!exercises.length){
     showStatusMessage('英語テキストが見つかりません。');
     return;
@@ -500,7 +399,6 @@ function onChar(input, baseCode){
   // baseCode は仮想/物理入力の基底キーID（キーフラッシュ用）
   const expected = flatText[cursor];
   if(!expected) return;
-  ensureTypingStarted();
   const ch = String(input);
   const ok = expected === ch;
   if(ok){
@@ -524,11 +422,6 @@ function onBackspace(){
 }
 
 function handleSpaceKey(baseCode='space'){
-  if(!flatText.length){
-    flashKey(baseCode, true);
-    return;
-  }
-  ensureTypingStarted();
   if(cursor===flatText.length){
     flashKey(baseCode, true);
     return advanceLine();
@@ -574,12 +467,6 @@ function prepareSource(){
     if(words.length) flattened.push(...words);
   });
   sourceWords = flattened;
-  if(flattened.length){
-    const totalChars = flattened.reduce((acc, word)=> acc + word.length, 0) + Math.max(flattened.length - 1, 0);
-    totalRequiredChars = totalChars;
-  }else{
-    totalRequiredChars = 0;
-  }
 }
 function pickSentence(){
   const set = currentSet();
@@ -627,8 +514,7 @@ function advanceLine(){
     nextPreview1 = "";
     nextPreview2 = "";
     renderText();
-    const summary = buildCompletionSummary();
-    showStatusMessage(`入力が完了しました！${summary}`);
+    showStatusMessage('テキストの入力が完了しました。');
     return;
   }
   layoutThreeLines();
@@ -685,7 +571,7 @@ function init(){
   window.addEventListener('resize', onResize);
   // 初期表示はレイアウト確定後に実行（キーボード幅が0になるのを回避）
   requestAnimationFrame(()=>{
-    loadDefaultText();
+    showStatusMessage('テキストファイルを選択してください。');
   });
 }
 window.addEventListener('DOMContentLoaded', init);

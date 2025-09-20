@@ -21,8 +21,6 @@ const DVORAK_ROW3 = [";","q","j","k","x","b","m","w","v","z"];
 // marks[]        : 0=未入力 / 1=正解 / -1=ミス（renderTextで色分け）
 // shiftSticky    : 仮想Shiftのトグル（1打鍵で自動解除）
 // shiftPhysical  : 物理Shiftの押下状態
-const DEFAULT_TEXT_PATH = 'default.txt';
-const DEFAULT_TEXT_FALLBACK = '## Presentation01\nBecause Japan is surrounded by the sea, and 67% of its land area is mountainous, there are numerous scenic spots in Japan.';
 let currentFileName = '';
 
 // 共通：候補単語列（教材内の本文全体を単語化）
@@ -198,44 +196,6 @@ function loadFromFile(file){
     if(filePicker) filePicker.value = '';
   };
   reader.readAsText(file);
-}
-
-function loadDefaultText(){
-  if(!DEFAULT_TEXT_PATH) return;
-  const applyText = (text)=>{
-    const base = DEFAULT_TEXT_PATH.replace(/\.[^.]+$/, '') || 'Text';
-    const blocks = parseCompiledText(text, base);
-    if(!blocks.length) throw new Error('Dataset is empty');
-    currentFileName = DEFAULT_TEXT_PATH;
-    applyDataset(blocks);
-    setFileStatus(`${DEFAULT_TEXT_PATH}`);
-  };
-
-  setFileStatus(`${DEFAULT_TEXT_PATH} を読み込み中...`);
-  showStatusMessage('読み込み中...');
-  fetch(DEFAULT_TEXT_PATH)
-    .then(res=>{
-      if(!res.ok) throw new Error(`Failed to load ${DEFAULT_TEXT_PATH}`);
-      return res.text();
-    })
-    .then(applyText)
-    .catch(err=>{
-      console.error(err);
-      if(DEFAULT_TEXT_FALLBACK){
-        try{
-          applyText(DEFAULT_TEXT_FALLBACK);
-          return;
-        }catch(fallbackErr){
-          console.error(fallbackErr);
-        }
-      }
-      currentFileName = '';
-      exercises = [];
-      resetTypingMetrics();
-      totalRequiredChars = 0;
-      showStatusMessage('テキストファイルを選択してください。');
-      setFileStatus('未選択');
-    });
 }
 
 function applyDataset(blocks){
@@ -685,7 +645,7 @@ function init(){
   window.addEventListener('resize', onResize);
   // 初期表示はレイアウト確定後に実行（キーボード幅が0になるのを回避）
   requestAnimationFrame(()=>{
-    loadDefaultText();
+    showStatusMessage('テキストファイルを選択してください。');
   });
 }
 window.addEventListener('DOMContentLoaded', init);
