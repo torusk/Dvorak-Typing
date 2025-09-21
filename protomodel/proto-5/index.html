@@ -9,8 +9,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Dvorakタイピング練習" />
     <meta property="og:title" content="Dvorakタイピング練習ツール" />
-    <meta property="og:description"
-  content="QWERTYより快適で正確！ブラウザでDvorak配列のタイピングを練習できます。Dvorak配列のキーマップをPDFでダウンロード可能。さらにテキストファイルを読み込めば、自分の好きな内容でタイピング練習ができます。" />
+    <meta property="og:description" content="QWERTYより快適で正確！ブラウザでDvorak配列のタイピングを練習できます。" />
     <meta property="og:url" content="https://dvorak-typing.vercel.app/" />
     <meta property="og:image" content="https://dvorak-typing.vercel.app/og-image-dv.png" />
     <meta property="og:image:width" content="1200" />
@@ -19,8 +18,7 @@
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Dvorakタイピング練習ツール" />
-    <meta name="twitter:description"
-  content="QWERTYより快適で正確！ブラウザでDvorak配列のタイピングを練習できます。Dvorak配列のキーマップをPDFでダウンロード可能。さらにテキストファイルを読み込めば、自分の好きな内容でタイピング練習ができます。" />
+    <meta name="twitter:description" content="QWERTYより快適で正確！ブラウザでDvorak配列のタイピングを練習できます。" />
     <meta name="twitter:image" content="https://dvorak-typing.vercel.app/og-image-dv.png" />
 
     <link rel="stylesheet" href="style.css" />
@@ -28,23 +26,17 @@
   <body>
     <!-- アプリ上部の固定ヘッダー（タイトルと操作系） -->
     <header class="app-header">
-  <h1 class="title">Dvorak Typing</h1>
-
-  <div class="controls">
-  <div class="controls-stack">
-    <!-- 上段：Dvorak配列DL -->
-    <button id="dlBtn" class="btn" type="button" title="Dvorak配列のA4画像をダウンロード">
-      Dvorak配列DL
-    </button>
-
-    <!-- 下段：ファイル選択（ラベル文は削除。input は隠して pickBtn で開く） -->
-    <div class="file-picker">
-      <input id="filePicker" type="file" accept=".txt" />
-      <button id="pickBtn" class="btn" type="button">ファイルを選択</button>
-    </div>
-  </div>
-</div>
-</header>
+      <h1 class="title">Dvorak Typing</h1>
+      <!-- 基本操作: リセット/スキップ と 練習モードの切替 -->
+      <div class="controls">
+        <label class="file-picker">
+          教材読み込み:
+          <input id="filePicker" type="file" accept=".txt" />
+        </label>
+        <span id="fileStatus" class="file-status">未選択</span>
+        <button id="dlBtn" class="btn" type="button" title="Dvorak配列のA4画像をダウンロード">Dvorak配列DL</button>
+      </div>
+    </header>
 
     <!-- メイン領域：テキスト・仮想キーボード -->
     <main class="game" aria-live="polite">

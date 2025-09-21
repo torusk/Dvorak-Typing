@@ -38,46 +38,24 @@ body{
 }
 
 .app-header{
-  display:grid;
-  grid-template-columns: 1fr auto 1fr; /* 左余白 | タイトル | 右側コントロール */
+  display:flex;
   align-items:center;
+  justify-content:space-between;
   padding:8px 12px;
   border-bottom:1px solid #e5e7eb;
   background:#fff;
 }
-.title{
-  grid-column: 2;
-  justify-self: center;
-  font-size: 25px;
-  margin: 0;
-}
-.controls{
-  grid-column: 3;
-  justify-self: end;
-  display:flex;
-  flex-direction:column; /* ←縦積みに一本化 */
-  align-items:flex-end;
-  gap:8px;
-}
+.title{font-size:18px;margin:0}
 .btn{
   appearance:none;border:1px solid #e5e7eb;background:#fff;color:#111;
   padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:600
 }
 .btn:active{transform:translateY(1px)}
+.controls{display:flex;gap:12px;align-items:center}
 .file-picker{display:flex;flex-direction:column;font-size:14px;font-weight:600;gap:4px}
 .file-picker input{max-width:220px}
 .file-status{font-size:13px;color:#6b7280;font-weight:500}
-/* 組み込みのファイル入力は完全に隠す */
-.file-picker input[type="file"]{
-  position:absolute;
-  left:-9999px;
-  width:0;
-  height:0;
-  opacity:0;
-}
 
-/* （任意）ステータスを出したくないとき */
-.file-status{ display:none; }
 .game{
   max-width:920px; margin:0 auto; padding:24px; width:100%; flex:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;

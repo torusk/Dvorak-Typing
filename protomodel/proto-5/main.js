@@ -51,7 +51,6 @@ const keyboardEl = document.getElementById("keyboard");
 const filePicker = document.getElementById("filePicker");
 const fileStatus = document.getElementById("fileStatus");
 const dlBtn = document.getElementById("dlBtn");
-const pickBtn = document.getElementById("pickBtn");
 
 // ===== ユーティリティ =====
 // clamp         : 数値の範囲制限
@@ -160,7 +159,7 @@ function wordsFromText(text){
 }
 
 function setFileStatus(label){
-  if(fileStatus) fileStatus.textContent = '';
+  if(fileStatus) fileStatus.textContent = label;
 }
 
 function loadFromFile(file){
@@ -651,9 +650,6 @@ function init(){
   }
   if(dlBtn){
     dlBtn.addEventListener('click', downloadLayouts);
-  }
-  if (pickBtn && filePicker) {
-    pickBtn.addEventListener('click', () => filePicker.click());
   }
 
   // 物理キーボード
