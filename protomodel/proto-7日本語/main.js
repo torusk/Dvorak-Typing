@@ -84,28 +84,28 @@ function markTypingCompleted(){
   return typingEndTime - typingStartTime;
 }
 function formatDuration(ms){
-  if(!(ms >= 0)) return '0s';
+  if(!(ms >= 0)) return '0秒';
   if(ms < 60000){
     const seconds = ms / 1000;
     const digits = seconds < 10 ? 2 : 1;
     const display = Number(seconds.toFixed(digits)).toString();
-    return `${display}s`;
+    return `${display}秒`;
   }
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   const parts = [];
-  if(hours) parts.push(`${hours}h`);
-  parts.push(`${minutes}m`);
-  parts.push(`${seconds}s`);
+  if(hours) parts.push(`${hours}時間`);
+  parts.push(`${minutes}分`);
+  parts.push(`${seconds}秒`);
   return parts.join('');
 }
 function buildCompletionSummary(){
   const elapsed = markTypingCompleted();
   if(elapsed == null) return '';
   const durationLabel = formatDuration(elapsed);
-  let summary = ` TIME ${durationLabel}`;
+  let summary = ` 所要 ${durationLabel}`;
   if(totalRequiredChars <= 0 || elapsed <= 0){
     summary += ' / WPM算出不可';
   }else{
@@ -629,7 +629,7 @@ function advanceLine(){
     nextPreview2 = "";
     renderText();
     const summary = buildCompletionSummary();
-    showStatusMessage(`Complete!${summary}`);
+    showStatusMessage(`入力が完了しました！${summary}`);
     return;
   }
   layoutThreeLines();
