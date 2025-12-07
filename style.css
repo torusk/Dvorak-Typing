@@ -132,7 +132,7 @@ body{
   letter-spacing:0.25px; /* ← 少しだけ広げる。詰めたい場合は 0 に */
 }
 .key.wide{min-width:84px}
-.key.space{min-width:50vw}
+.key.space{width:500px;max-width:90%}
 .key.active{
   /* 背景色はそのまま（灰色）。有効時は太い枠線で強調 */
   background:var(--key-bg);
