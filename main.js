@@ -22,7 +22,7 @@ const DVORAK_ROW3 = [";","q","j","k","x","b","m","w","v","z"];
 // shiftSticky    : 仮想Shiftのトグル（1打鍵で自動解除）
 // shiftPhysical  : 物理Shiftの押下状態
 const DEFAULT_TEXT_PATH = 'default.txt';
-const DEFAULT_TEXT_FALLBACK = '## Presentation01\nBecause Japan is surrounded by the sea, and 67% of its land area is mountainous, there are numerous scenic spots in Japan.';
+const DEFAULT_TEXT_FALLBACK = '## Welcome to ZenDvorak\nA sophisticated typing trainer rooted in the spirit of Japanese Zen. Designed to eliminate distraction and noise, this tool provides a "Zen garden" for your fingers to find their flow and mastery.';
 let currentFileName = '';
 
 // 共通：候補単語列（教材内の本文全体を単語化）
